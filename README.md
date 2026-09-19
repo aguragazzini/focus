@@ -84,6 +84,8 @@ BiometricPrompt (s2b HOLD), Accessibility, Device Admin, inbox de notifs, multi-
 Informe NLS vs arch §0: [`docs/WEEK2A-NLS-REPORT.md`](docs/WEEK2A-NLS-REPORT.md).  
 Informe semana 1: [`docs/WEEK1-REPORT.md`](docs/WEEK1-REPORT.md).
 
+Espejo público previsto: [github.com/aguragazzini/focus](https://github.com/aguragazzini/focus). Origin (Cursor) sigue siendo la fuente de verdad; este VM no pudo pushear a GitHub (sin auth). Ver [`PUSH.md`](PUSH.md).
+
 ## Documentos canónicos
 
 En `docs/`: arquitectura v1, delta NLS v0, notes NLS, UX onboarding NLS, UX v1, decisiones, spec funcional.

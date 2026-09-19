@@ -1,43 +1,59 @@
-# Publicar Foco Launcher en GitHub
+# GitHub public mirror
 
-Este entorno **no tiene `gh` autenticado** (ni `GITHUB_TOKEN`). El código vive en Origin. Cuando GitHub esté conectado en tu máquina, creá el repo **público** `foco-launcher` así.
+Public repo: **https://github.com/aguragazzini/focus**
 
-## Condiciones
+**Origin (Cursor) is the source of truth.** GitHub is a mirror only. Do not rename `origin` to GitHub.
 
-- Cuenta personal de GitHub autenticada: `gh auth status` debe mostrar tu usuario.
-- Working tree limpio (`git status`).
-- No commitear `local.properties`, `.env*`, `*.jks`, `*.keystore`, `secrets.properties`, `google-services.json`.
+## This Cloud Agent VM (2026-09-19)
 
-El `origin` de este clone apunta a **Cursor Origin**, no a GitHub. `gh repo create ... --remote=origin` falla si `origin` ya existe. Renombralo primero.
+`gh` is **not** logged in. There is no `GITHUB_TOKEN` / `GH_TOKEN`, no `~/.netrc`, and no SSH key that GitHub accepts.
 
-## Comandos
+Attempted:
 
 ```bash
-# 1) Login (una vez)
-gh auth login
-
-# 2) Conservar Origin como remoto aparte
-git remote rename origin cursor-origin
-
-# 3) Crear el repo público y pushear main
-gh repo create foco-launcher --public --source=. --remote=origin --push
+git remote add github https://github.com/aguragazzini/focus.git
+GIT_TERMINAL_PROMPT=0 git push github main
 ```
 
-Repo esperado: `https://github.com/<tu-usuario>/foco-launcher`
+Exact errors:
 
-Si `foco-launcher` ya existe vacío en tu cuenta:
+```
+HTTPS: remote: No anonymous write access.
+      fatal: Authentication failed for 'https://github.com/aguragazzini/focus.git/'
+      (git exit 128)
+
+SSH:   git@github.com: Permission denied (publickey).
+
+gh:    You are not logged into any GitHub hosts. To log in, run: gh auth login
+```
+
+The public repo currently has only GitHub’s **Initial commit** (`README.md`, `a78caa01`). Our `main` was **not** mirrored. NLS 2a delivery does not depend on this push.
+
+## Push from a machine that *is* logged in
+
+Keep Origin as `origin`. Add the mirror remote and push `main`:
 
 ```bash
-git remote rename origin cursor-origin
-git remote add origin git@github.com:<tu-usuario>/foco-launcher.git
-git push -u origin main
+git remote add github https://github.com/aguragazzini/focus.git
+# if the remote already exists:
+# git remote set-url github https://github.com/aguragazzini/focus.git
+
+git push github main
 ```
 
-## Qué no subir
+GitHub `main` is **not empty** (placeholder README). A normal push will be rejected as non-fast-forward until that commit is replaced. One force is OK **only** to overlay that empty README with this tree:
 
-- Keystores con password / claves privadas
-- Tokens, `.env`, `secrets.properties`
-- `local.properties` (ruta del SDK)
-- APKs (`*.apk` está en `.gitignore`)
+```bash
+git push github main --force
+```
 
-El APK de debug se arma en cada máquina con el keystore de debug de Gradle (`~/.android/debug.keystore`), que es local y no forma parte del repo.
+After that, prefer normal `git push github main`.
+
+## What must stay out of git
+
+Already in `.gitignore` (verified, none of these are tracked):
+
+- `*.apk` `*.jks` `*.keystore`
+- `secrets.properties` `local.properties` `.env*` `google-services.json`
+
+APKs live in the agent Artifacts panel, not in git. See `dist/TRANSFER.md`.

@@ -36,5 +36,7 @@ A rebuild on another machine produces a **different** debug signature (local deb
 
 ## Source
 
-Origin (source of truth until a public GitHub URL is pasted):  
+Origin (source of truth):  
 https://origin.cursor.com/git/agust-n-ragazzini/tmp-2c3ab32c79db0e54
+
+Public GitHub mirror (intended): https://github.com/aguragazzini/focus — this Cloud Agent VM could not write (no GitHub auth). See `PUSH.md`.
