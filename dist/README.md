@@ -5,7 +5,7 @@ Entrega actual (NLS 0.2.0): `foco-launcher-v0.2-nls.apk`
 SHA256:
 
 ```
-7457448c07da8dbc534b9836332070e6072e424cb81837172064f0d8d6747dad
+69e911be5b9174613777f93f103f886d489784f8cff3d52266b6803d88c5e821
 ```
 
 ## Download from the cloud agent Artifacts panel
@@ -18,7 +18,7 @@ SHA256:
 
 ```bash
 sha256sum foco-launcher-v0.2-nls.apk
-# expect 7457448c07da8dbc534b9836332070e6072e424cb81837172064f0d8d6747dad
+# expect 69e911be5b9174613777f93f103f886d489784f8cff3d52266b6803d88c5e821
 ```
 
 If the Artifacts UI hits an auth wall from another machine, copy the file locally from a session that is already logged into Cursor, then drop it into the shared box.

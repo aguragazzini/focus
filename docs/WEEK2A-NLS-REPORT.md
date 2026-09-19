@@ -4,7 +4,11 @@ Techo: `docs/foco-launcher-arch-nls-v0.md` §0 / §9. Notes: `docs/foco-launcher
 
 APK: `foco-launcher-v0.2-nls.apk` · versionName **0.2.0** · versionCode **2**
 
-SHA256: ver `dist/TRANSFER.md` (se actualiza en cada `assembleDebug`).
+SHA256:
+
+```
+69e911be5b9174613777f93f103f886d489784f8cff3d52266b6803d88c5e821
+```
 
 ## Nico review (GO 2a)
 

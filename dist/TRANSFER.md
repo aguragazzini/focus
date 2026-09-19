@@ -5,7 +5,7 @@ APK **not** in git. Download from this agent’s Artifacts panel.
 ## SHA256
 
 ```
-7457448c07da8dbc534b9836332070e6072e424cb81837172064f0d8d6747dad
+69e911be5b9174613777f93f103f886d489784f8cff3d52266b6803d88c5e821
 ```
 
 | File | Path |
@@ -32,4 +32,4 @@ https://origin.cursor.com/git/agust-n-ragazzini/tmp-2c3ab32c79db0e54
 adb install -r foco-launcher-v0.2-nls.apk
 ```
 
-NLS is **optional** after Foco is home: Ajustes → Notificaciones → Silenciar otras notificaciones → activá Foco en acceso a notificaciones. Motorola: Ajustes → Notificaciones → acceso / apps con acceso. Work profile notifs are never filtered.
+NLS is **optional** after Foco is home: Ajustes → Notificaciones → Silenciar otras notificaciones → activá Foco en acceso a notificaciones. Motorola: Ajustes → Notificaciones → acceso / apps con acceso. Work profile notifs are never filtered. Apps not on the home list do not notify. `allowNotif=false` keeps the icon and silences the alert.
