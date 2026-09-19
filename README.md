@@ -27,6 +27,12 @@ app/build/outputs/apk/debug/app-debug.apk
 
 Copia de entrega (mismo binario): `foco-launcher-v0.1-w1.apk`.
 
+SHA256 de la entrega week-1:
+
+```
+27aa77968b7ecc46380fd94f1d5d89db13bbcf70eb482dc88c05654c4b4343e7
+```
+
 ## Sideload en Motorola (Edge 30 y familia)
 
 1. En el teléfono: **Ajustes → Seguridad** (o **Privacidad**) → permitir **orígenes desconocidos** / instalar apps desconocidas para el navegador o Archivos, según el OEM.

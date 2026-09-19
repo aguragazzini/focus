@@ -27,12 +27,13 @@ object WhitelistMutations {
     }
 
     fun move(entries: List<WhitelistEntry>, fromIndex: Int, toIndex: Int): List<WhitelistEntry> {
-        if (fromIndex == toIndex) return entries.normalized()
-        if (fromIndex !in entries.indices || toIndex !in entries.indices) return entries.normalized()
-        val mutable = entries.sortedBy { it.order }.toMutableList()
+        val ordered = entries.sortedBy { it.order }
+        if (fromIndex == toIndex) return ordered.normalized()
+        if (fromIndex !in ordered.indices || toIndex !in ordered.indices) return ordered.normalized()
+        val mutable = ordered.toMutableList()
         val item = mutable.removeAt(fromIndex)
         mutable.add(toIndex, item)
-        return mutable.normalized()
+        return mutable.mapIndexed { index, entry -> entry.copy(order = index) }
     }
 
     fun pruneOrphans(entries: List<WhitelistEntry>, installed: Set<String>): List<WhitelistEntry> {

@@ -58,7 +58,19 @@ minSdk **26**, targetSdk **34**, compileSdk **34**, portrait lock. Subir a 29 qu
 # app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Entrega: `/opt/cursor/artifacts/foco-launcher-v0.1-w1.apk` (+ `.b64`). SHA256 se imprime al armar.
+Entrega (debug, firmado con keystore debug de Gradle):
+
+- `/opt/cursor/artifacts/foco-launcher-v0.1-w1.apk`
+- `/opt/cursor/artifacts/foco-launcher-v0.1-w1.apk.b64` (base64 de una sola línea)
+- `/opt/cursor/artifacts/foco-launcher-v0.1-w1.apk.tar.gz`
+
+SHA256 (`foco-launcher-v0.1-w1.apk`):
+
+```
+27aa77968b7ecc46380fd94f1d5d89db13bbcf70eb482dc88c05654c4b4343e7
+```
+
+Rebuild local: `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/app-debug.apk`.
 
 ## Sideload Motorola
 

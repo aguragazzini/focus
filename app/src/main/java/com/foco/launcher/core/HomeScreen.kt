@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalFoundationApi::class)
+
 package com.foco.launcher.core
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -54,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import com.foco.launcher.R
 import com.foco.launcher.registry.LaunchableApp
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     state: HomeUiState,
