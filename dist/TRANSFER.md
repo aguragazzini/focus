@@ -24,7 +24,9 @@ Package `com.foco.launcher` · `0.2.0` (versionCode 2) · Gradle debug keystore 
 
 ## Origin
 
-https://origin.cursor.com/git/agust-n-ragazzini/tmp-2c3ab32c79db0e54
+Cursor Origin is the source of truth.
+
+Public GitHub mirror (intended): https://github.com/aguragazzini/focus — this VM could not write (see `PUSH.md`).
 
 ## Sideload
 
