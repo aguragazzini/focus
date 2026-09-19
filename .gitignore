@@ -22,7 +22,9 @@ app/release/
 # Local SDK path and secrets — never commit
 local.properties
 secrets.properties
+secrets*
 .env
+.env*
 .env.*
 .envrc
 google-services.json
