@@ -1,7 +1,6 @@
 .gradle/
 .idea/
 *.iml
-local.properties
 .cxx/
 captures/
 **/build/
@@ -12,9 +11,21 @@ captures/
 *.class
 .DS_Store
 uploads/
+dist/
 *.log
 .kotlin/
 app/release/
+
+# Local SDK path and secrets — never commit
+local.properties
+secrets.properties
+.env
+.env.*
+.envrc
+google-services.json
+
+# Signing material — debug uses the local Gradle keystore (~/.android/debug.keystore)
 *.jks
 *.keystore
-!debug.keystore
+*.p12
+*.pem

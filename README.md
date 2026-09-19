@@ -11,7 +11,7 @@ Solo ves las apps que elegís. El resto no aparece.
 
 - JDK 17+ (probado con 21)
 - Android SDK **compileSdk / targetSdk 34**, minSdk **26**
-- Variable `ANDROID_HOME` o `local.properties` con `sdk.dir`
+- Variable `ANDROID_HOME` o un `local.properties` local (ese archivo no se commitea)
 
 ```bash
 export ANDROID_HOME="$HOME/android-sdk"
@@ -19,7 +19,7 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew :app:assembleDebug
 ```
 
-APK de debug (firmado con el keystore de debug de Gradle):
+El APK de debug lo firma Gradle con el keystore de debug **local** (`~/.android/debug.keystore`). No hay keystores ni secretos en este repo.
 
 ```
 app/build/outputs/apk/debug/app-debug.apk
@@ -33,7 +33,7 @@ SHA256 de la entrega week-1:
 27aa77968b7ecc46380fd94f1d5d89db13bbcf70eb482dc88c05654c4b4343e7
 ```
 
-## Sideload en Motorola (Edge 30 y familia)
+## Sideload en Motorola (Edge 30 y modelos cercanos)
 
 1. En el teléfono: **Ajustes → Seguridad** (o **Privacidad**) → permitir **orígenes desconocidos** / instalar apps desconocidas para el navegador o Archivos, según el OEM.
 2. Copiá el APK (`adb install -r app-debug.apk` o abrirlo desde Archivos).
@@ -77,7 +77,8 @@ adb shell am start -a android.intent.action.VIEW -d foco://settings -n com.foco.
 
 BiometricPrompt, NotificationListener, Accessibility, multi-module Gradle, Play Store.
 
-Informe semana 1 vs checklist: [`docs/WEEK1-REPORT.md`](docs/WEEK1-REPORT.md).
+Informe semana 1 vs checklist: [`docs/WEEK1-REPORT.md`](docs/WEEK1-REPORT.md).  
+Publicar en GitHub: [`PUSH.md`](PUSH.md).
 
 ## Documentos canónicos
 
@@ -85,4 +86,4 @@ En `docs/`: arquitectura v1 (techo), notes Android (checklist), OK Andrés seman
 
 ## Licencia
 
-Uso personal. Sideload. Sin backend.
+Sideload. Sin backend. Sin cuenta.

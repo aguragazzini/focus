@@ -76,4 +76,4 @@ Rebuild local: `./gradlew :app:assembleDebug` → `app/build/outputs/apk/debug/a
 
 Ver README: Default apps → Home, setup primero, deep link `adb shell am start -a android.intent.action.VIEW -d foco://settings`.
 
-Item notes §1 “Sideload en Edge 30; ≥4–6 h como HOME” **no se puede cerrar desde este entorno** (no hay el teléfono). El APK es instalable; QA en device de Agus.
+Item notes §1 “Sideload en Edge 30; ≥4–6 h como HOME” **no se puede cerrar desde este entorno** (no hay el teléfono). El APK es instalable; QA en el dispositivo de prueba.
