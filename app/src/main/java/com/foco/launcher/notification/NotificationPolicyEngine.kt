@@ -3,6 +3,7 @@ package com.foco.launcher.notification
 import android.app.Notification
 import android.content.Context
 import android.service.notification.StatusBarNotification
+import com.foco.launcher.registry.PrefsStore
 import com.foco.launcher.registry.SuggestedApps
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -13,19 +14,19 @@ import java.util.concurrent.atomic.AtomicReference
 
 class NotificationPolicyEngine(
     private val context: Context,
-    allowlistStore: NotificationAllowlistStore,
+    prefsStore: PrefsStore,
 ) {
     private val appContext = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val snapshot = AtomicReference(Snapshot())
 
     init {
-        allowlistStore.prefs
+        prefsStore.prefs
             .onEach { prefs ->
                 snapshot.set(
                     Snapshot(
                         nlsFilterEnabled = prefs.nlsFilterEnabled,
-                        packages = prefs.packages,
+                        packages = prefs.notificationAllowlist,
                     ),
                 )
             }
@@ -49,6 +50,7 @@ class NotificationPolicyEngine(
             facts = facts,
             nlsFilterEnabled = current.nlsFilterEnabled,
             allowlist = current.packages,
+            listenerGranted = NlsStatus.isGranted(appContext),
         )
     }
 

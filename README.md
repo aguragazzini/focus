@@ -65,14 +65,16 @@ No hace falta para ser launcher. En **Ajustes → Notificaciones** prendé **Sil
 
 En Motorola: **Ajustes → Notificaciones → acceso / apps con acceso**.
 
-El filtro es del **perfil personal**. Las notificaciones del **perfil de trabajo no se tocan**. Llamadas, alarmas, navegación y media en curso no se silencian. Sin el permiso del sistema, el filtro no se presenta como activo.
+El filtro es del **perfil personal**. Las notificaciones del **perfil de trabajo no se tocan** (`UserHandle`). Llamadas, alarmas, navegación y media en curso no se silencian. Sin el permiso del sistema, el filtro no se presenta como activo.
+
+Apps en el home avisan por defecto (`allowNotif=true`). Podés apagar el switch por app: el ícono sigue; el aviso no. Apps que no están en Foco no avisan.
 
 ## Qué hay en 0.2.0 (semana 2a)
 
 - Todo lo de semana 1, más `FocoNotificationListener` + `NotificationPolicy.shouldSuppress`.
-- DataStore **separado**: `notificationAllowlist` ≠ whitelist del home. Seed 1× opcional desde home.
-- Flag `nlsFilterEnabled`. **No** gatea ROLE_HOME.
-- Settings **Avisos** + onboarding NLS (copy ES-AR).
+- `allowNotif` en cada entry del home. `notificationAllowlist` **derivado** (`entries.filter { allowNotif }`).
+- Flag `nlsFilterEnabled`. **No** gatea ROLE_HOME ni el picker de inicio.
+- Settings **Notificaciones** + onboarding NLS (copy ES-AR Camila). Lista = solo apps del home personal.
 - Work profile: PASS always (`sbn.user` / UserHandle). Sin Device Admin / DPM / Accessibility. Sin inbox. Sin bio.
 
 ## Fuera de este corte

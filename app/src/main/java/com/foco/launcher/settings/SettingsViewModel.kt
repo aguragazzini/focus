@@ -16,16 +16,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-enum class SettingsDest { Main, Edit, Add, Avisos, AvisosAdd, NlsOnboarding }
+enum class SettingsDest { Main, Edit, Add, Avisos, NlsOnboarding }
 
 data class AvisosRow(
     val app: LaunchableApp,
     val allowed: Boolean,
-    val onHome: Boolean,
+    val onHome: Boolean = true,
 )
 
 data class SettingsUiState(
@@ -44,8 +43,6 @@ data class SettingsUiState(
     val nlsActive: Boolean = false,
     val hasWorkProfile: Boolean = false,
     val avisosRows: List<AvisosRow> = emptyList(),
-    val avisosCatalog: List<LaunchableApp> = emptyList(),
-    val pendingAvisosAdd: Set<String> = emptySet(),
     val nlsMessage: String? = null,
 )
 
@@ -53,7 +50,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val app = application as FocoApp
     private val dest = MutableStateFlow(SettingsDest.Main)
     private val pendingAdd = MutableStateFlow<Set<String>>(emptySet())
-    private val pendingAvisosAdd = MutableStateFlow<Set<String>>(emptySet())
     private val isDefault = MutableStateFlow(false)
     private val removeCandidate = MutableStateFlow<LaunchableApp?>(null)
     private val nlsTick = MutableStateFlow(0)
@@ -68,15 +64,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 dest,
                 app.prefsStore.prefs,
                 app.registry.launchables,
-                app.notificationAllowlistStore.prefs,
                 nlsTick,
-            ) { d, prefs, all, notif, _ ->
-                CoreSnap(d, prefs, all, notif.nlsFilterEnabled, notif.packages)
+            ) { d, prefs, all, _ ->
+                CoreSnap(d, prefs, all)
             }.combine(pendingAdd) { core, pending -> core to pending }
-                .combine(pendingAvisosAdd) { pair, avisosPending -> Triple(pair.first, pair.second, avisosPending) }
-                .combine(removeCandidate) { triple, remove ->
-                    val (core, pending, avisosPending) = triple
-                    buildState(core, pending, avisosPending, remove, nlsMessage.value)
+                .combine(removeCandidate) { pair, remove ->
+                    val (core, pending) = pair
+                    buildState(core, pending, remove, nlsMessage.value)
                 }
                 .combine(nlsMessage) { ui, msg -> ui.copy(nlsMessage = msg) }
                 .combine(isDefault) { ui, defaultHome -> ui.copy(isDefaultHome = defaultHome) }
@@ -93,7 +87,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             else -> SettingsDest.Main
         }
         if (dest.value != SettingsDest.Add) pendingAdd.value = emptySet()
-        if (dest.value != SettingsDest.AvisosAdd) pendingAvisosAdd.value = emptySet()
     }
 
     fun openEdit() {
@@ -110,21 +103,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         nlsTick.value += 1
     }
 
-    fun openAvisosAdd() {
-        pendingAvisosAdd.value = emptySet()
-        dest.value = SettingsDest.AvisosAdd
-    }
-
     fun onBack(): Boolean {
         return when (dest.value) {
             SettingsDest.Add -> {
                 dest.value = SettingsDest.Edit
                 pendingAdd.value = emptySet()
-                true
-            }
-            SettingsDest.AvisosAdd -> {
-                dest.value = SettingsDest.Avisos
-                pendingAvisosAdd.value = emptySet()
                 true
             }
             SettingsDest.NlsOnboarding -> {
@@ -155,7 +138,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun requestEnableFilter(enabled: Boolean) {
         viewModelScope.launch {
             if (!enabled) {
-                app.notificationAllowlistStore.setFilterEnabled(false)
+                app.prefsStore.setNlsFilterEnabled(false)
                 return@launch
             }
             if (NlsStatus.isGranted(getApplication())) {
@@ -168,7 +151,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun skipNlsOnboarding() {
         viewModelScope.launch {
-            app.notificationAllowlistStore.setFilterEnabled(false)
+            app.prefsStore.setNlsFilterEnabled(false)
             dest.value = SettingsDest.Avisos
         }
     }
@@ -179,20 +162,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setNotifAllowed(packageName: String, allowed: Boolean) {
         viewModelScope.launch {
-            app.notificationAllowlistStore.setAllowed(packageName, allowed)
+            app.prefsStore.setAllowNotif(packageName, allowed)
         }
     }
 
     fun togglePending(packageName: String) {
         pendingAdd.update { current ->
-            val next = current.toMutableSet()
-            if (!next.add(packageName)) next.remove(packageName)
-            next
-        }
-    }
-
-    fun togglePendingAvisos(packageName: String) {
-        pendingAvisosAdd.update { current ->
             val next = current.toMutableSet()
             if (!next.add(packageName)) next.remove(packageName)
             next
@@ -209,19 +184,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
                 prefs.copy(entries = WhitelistMutations.addAll(prefs.entries, packages))
             }
-            app.notificationAllowlistStore.addAll(toAdd)
             pendingAdd.value = emptySet()
             dest.value = SettingsDest.Edit
-        }
-    }
-
-    fun confirmAvisosAdd() {
-        val toAdd = pendingAvisosAdd.value
-        if (toAdd.isEmpty()) return
-        viewModelScope.launch {
-            app.notificationAllowlistStore.addAll(toAdd)
-            pendingAvisosAdd.value = emptySet()
-            dest.value = SettingsDest.Avisos
         }
     }
 
@@ -256,9 +220,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     private suspend fun enableFilterAfterGrant() {
-        val homePkgs = app.prefsStore.prefs.first().entries.map { it.packageName }
-        app.notificationAllowlistStore.seedFromHomeIfNeeded(homePkgs)
-        app.notificationAllowlistStore.setFilterEnabled(true)
+        app.prefsStore.setNlsFilterEnabled(true)
         dest.value = SettingsDest.Avisos
         nlsMessage.value = getApplication<Application>().getString(com.foco.launcher.R.string.nls_done)
         nlsTick.value += 1
@@ -267,7 +229,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private fun buildState(
         core: CoreSnap,
         pending: Set<String>,
-        avisosPending: Set<String>,
         remove: LaunchableApp?,
         message: String?,
     ): SettingsUiState {
@@ -279,17 +240,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             SuggestedApps.isSystemSettings(getApplication(), it.packageName)
         }?.packageName
         val granted = NlsStatus.isGranted(getApplication())
-        val homeSet = selected
-        val extraAllowed = core.allowlist.filter { it !in homeSet }.mapNotNull { byPkg[it] }
-        val rows = buildList {
-            for (appItem in whitelist) {
-                add(AvisosRow(appItem, appItem.packageName in core.allowlist, onHome = true))
-            }
-            for (appItem in extraAllowed) {
-                add(AvisosRow(appItem, allowed = true, onHome = false))
-            }
+        val allowByPkg = core.prefs.entries.associate { it.packageName to it.allowNotif }
+        val rows = whitelist.map { appItem ->
+            AvisosRow(
+                app = appItem,
+                allowed = allowByPkg[appItem.packageName] != false,
+                onHome = true,
+            )
         }
-        val avisosCatalog = core.all.filterNot { it.packageName in core.allowlist }
         return SettingsUiState(
             dest = core.dest,
             versionName = com.foco.launcher.BuildConfig.VERSION_NAME,
@@ -301,13 +259,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             removeCandidate = remove,
             removeIsLast = remove != null && whitelist.size <= 1,
             removeIsSettings = remove != null && settingsPkg != null && remove.packageName == settingsPkg,
-            nlsFilterEnabled = core.nlsFilterEnabled,
+            nlsFilterEnabled = core.prefs.nlsFilterEnabled,
             nlsGranted = granted,
-            nlsActive = NlsStatus.isFilterActive(getApplication(), core.nlsFilterEnabled),
+            nlsActive = NlsStatus.isFilterActive(getApplication(), core.prefs.nlsFilterEnabled),
             hasWorkProfile = UserProfileHelper.hasWorkProfile(getApplication()),
             avisosRows = rows,
-            avisosCatalog = avisosCatalog,
-            pendingAvisosAdd = avisosPending,
             nlsMessage = message,
         )
     }
@@ -316,8 +272,6 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val dest: SettingsDest,
         val prefs: LauncherPrefs,
         val all: List<LaunchableApp>,
-        val nlsFilterEnabled: Boolean,
-        val allowlist: Set<String>,
     )
 
     companion object {

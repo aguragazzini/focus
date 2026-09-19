@@ -5,13 +5,12 @@ import com.foco.launcher.notification.NotificationAllowlistStore
 import com.foco.launcher.notification.NotificationPolicyEngine
 import com.foco.launcher.registry.PackageRegistry
 import com.foco.launcher.registry.PrefsStore
+import kotlinx.coroutines.runBlocking
 
 class FocoApp : Application() {
     lateinit var prefsStore: PrefsStore
         private set
     lateinit var registry: PackageRegistry
-        private set
-    lateinit var notificationAllowlistStore: NotificationAllowlistStore
         private set
     lateinit var notificationPolicy: NotificationPolicyEngine
         private set
@@ -19,8 +18,10 @@ class FocoApp : Application() {
     override fun onCreate() {
         super.onCreate()
         prefsStore = PrefsStore(this)
-        notificationAllowlistStore = NotificationAllowlistStore(this)
-        registry = PackageRegistry(this, prefsStore, notificationAllowlistStore)
-        notificationPolicy = NotificationPolicyEngine(this, notificationAllowlistStore)
+        runBlocking {
+            NotificationAllowlistStore.migrateInto(prefsStore, NotificationAllowlistStore(this@FocoApp))
+        }
+        registry = PackageRegistry(this, prefsStore)
+        notificationPolicy = NotificationPolicyEngine(this, prefsStore)
     }
 }

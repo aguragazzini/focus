@@ -6,8 +6,6 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -16,8 +14,10 @@ private val Context.notificationAllowlistDataStore: DataStore<Preferences> by pr
 )
 
 /**
- * Store separado de la whitelist del home.
- * Personal: solo estos packages avisan cuando [NotificationAllowlistPrefs.nlsFilterEnabled].
+ * Legacy store from the first 0.2 cut (separate package set).
+ * Source of truth is now [com.foco.launcher.registry.LauncherPrefs]:
+ * `notificationAllowlist = entries.filter { allowNotif }`.
+ * Kept only to migrate nlsFilterEnabled + muted packages once.
  */
 class NotificationAllowlistStore(context: Context) {
     private val dataStore = context.applicationContext.notificationAllowlistDataStore
@@ -26,58 +26,41 @@ class NotificationAllowlistStore(context: Context) {
         encodeDefaults = true
     }
 
-    val prefs: Flow<NotificationAllowlistPrefs> = dataStore.data.map { snapshot ->
-        val raw = snapshot[KEY_JSON]
-        if (raw.isNullOrBlank()) NotificationAllowlistPrefs()
-        else runCatching { json.decodeFromString<NotificationAllowlistPrefs>(raw) }
-            .getOrDefault(NotificationAllowlistPrefs())
-    }
-
-    suspend fun update(transform: (NotificationAllowlistPrefs) -> NotificationAllowlistPrefs) {
+    suspend fun consumeForMigration(): NotificationAllowlistPrefs? {
+        var snapshot: NotificationAllowlistPrefs? = null
         dataStore.edit { store ->
             val current = store[KEY_JSON]?.let {
                 runCatching { json.decodeFromString<NotificationAllowlistPrefs>(it) }.getOrNull()
             } ?: NotificationAllowlistPrefs()
-            store[KEY_JSON] = json.encodeToString(transform(current))
+            if (current.migratedToLauncherPrefs) {
+                snapshot = null
+            } else {
+                snapshot = current
+                store[KEY_JSON] = json.encodeToString(current.copy(migratedToLauncherPrefs = true))
+            }
         }
-    }
-
-    suspend fun setFilterEnabled(enabled: Boolean) {
-        update { it.copy(nlsFilterEnabled = enabled) }
-    }
-
-    suspend fun add(packageName: String) {
-        update { it.copy(packages = it.packages + packageName) }
-    }
-
-    suspend fun addAll(packageNames: Collection<String>) {
-        if (packageNames.isEmpty()) return
-        update { it.copy(packages = it.packages + packageNames) }
-    }
-
-    suspend fun remove(packageName: String) {
-        update { it.copy(packages = it.packages - packageName) }
-    }
-
-    suspend fun setAllowed(packageName: String, allowed: Boolean) {
-        update {
-            val next = if (allowed) it.packages + packageName else it.packages - packageName
-            it.copy(packages = next)
-        }
-    }
-
-    /** Seed 1× desde la whitelist del home. No activa el filtro. */
-    suspend fun seedFromHomeIfNeeded(homePackages: Collection<String>) {
-        update { prefs ->
-            if (prefs.seededFromHome) prefs
-            else prefs.copy(
-                packages = prefs.packages + homePackages,
-                seededFromHome = true,
-            )
-        }
+        return snapshot
     }
 
     companion object {
         private val KEY_JSON = stringPreferencesKey("notification_allowlist_json")
+
+        suspend fun migrateInto(prefsStore: com.foco.launcher.registry.PrefsStore, legacy: NotificationAllowlistStore) {
+            val previous = legacy.consumeForMigration() ?: return
+            if (!previous.nlsFilterEnabled && previous.packages.isEmpty() && !previous.seededFromHome) return
+            prefsStore.update { prefs ->
+                val nextEntries = if (previous.seededFromHome || previous.packages.isNotEmpty()) {
+                    prefs.entries.map { entry ->
+                        entry.copy(allowNotif = entry.packageName in previous.packages)
+                    }
+                } else {
+                    prefs.entries
+                }
+                prefs.copy(
+                    nlsFilterEnabled = prefs.nlsFilterEnabled || previous.nlsFilterEnabled,
+                    entries = nextEntries,
+                )
+            }
+        }
     }
 }

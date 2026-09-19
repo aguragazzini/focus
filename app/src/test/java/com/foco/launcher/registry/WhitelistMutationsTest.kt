@@ -13,7 +13,9 @@ class WhitelistMutationsTest {
         assertEquals(0, second[0].order)
         assertEquals(1, second[1].order)
         assertTrue(second[0].bioEnabled)
+        assertTrue(second[0].allowNotif)
         assertFalse(second[1].bioEnabled)
+        assertTrue(second[1].allowNotif)
     }
 
     @Test

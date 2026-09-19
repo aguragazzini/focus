@@ -85,7 +85,6 @@
     <string name="nls_work_title">Perfil de trabajo</string>
     <string name="nls_work_body">Foco no gestiona el perfil de trabajo. Esas notificaciones siguen llegando con normalidad.</string>
     <string name="nls_preserve">Llamadas, alarmas, navegación y media en curso no las silenciamos.</string>
-    <string name="nls_add">Sumar app a avisos</string>
     <string name="nls_banner">Filtro de avisos off</string>
     <string name="nls_banner_cta">Activar</string>
     <string name="nls_inactive">El filtro no está activo sin el permiso del sistema.</string>

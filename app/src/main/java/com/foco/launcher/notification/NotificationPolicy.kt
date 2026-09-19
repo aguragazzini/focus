@@ -1,15 +1,14 @@
 package com.foco.launcher.notification
 
 /**
- * Pure policy (arch §0 / §9). Android types stay out so unit tests can run on the JVM.
+ * Pure policy (arch §0 / Nico notes). Android types stay out so unit tests can run on the JVM.
  *
  * shouldSuppress:
- *   if work/other UserHandle → false (ALWAYS)
+ *   if work/other UserHandle → false (ALWAYS — never cancel)
+ *   if !nlsFilterEnabled || !listenerGranted → false
  *   if protected system/OEM → false
- *   if CALL / ALARM / NAVIGATION → false
- *   if MediaStyle / CATEGORY_TRANSPORT → false
- *   if !nlsFilterEnabled → false
- *   return package ∉ notificationAllowlist  // personal only
+ *   if CALL / ALARM / NAVIGATION / TRANSPORT / MediaStyle / dialer → false
+ *   return package ∉ notificationAllowlist  // personal only; empty allowlist cancels all such
  */
 object NotificationPolicy {
     data class Facts(
@@ -30,11 +29,12 @@ object NotificationPolicy {
         facts: Facts,
         nlsFilterEnabled: Boolean,
         allowlist: Set<String>,
+        listenerGranted: Boolean = true,
     ): Boolean {
         if (facts.isWorkOrOtherProfile) return false
+        if (!nlsFilterEnabled || !listenerGranted) return false
         if (isProtectedSystemOrOem(facts.packageName)) return false
         if (isCallAlarmMediaException(facts)) return false
-        if (!nlsFilterEnabled) return false
         return facts.packageName !in allowlist
     }
 

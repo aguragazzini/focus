@@ -45,6 +45,20 @@ class PrefsStore(context: Context) {
         update { it.copy(setupDone = done) }
     }
 
+    suspend fun setNlsFilterEnabled(enabled: Boolean) {
+        update { it.copy(nlsFilterEnabled = enabled) }
+    }
+
+    suspend fun setAllowNotif(packageName: String, allowed: Boolean) {
+        update { prefs ->
+            prefs.copy(
+                entries = prefs.entries.map { entry ->
+                    if (entry.packageName == packageName) entry.copy(allowNotif = allowed) else entry
+                },
+            )
+        }
+    }
+
     companion object {
         private val KEY_JSON = stringPreferencesKey("launcher_prefs_json")
     }

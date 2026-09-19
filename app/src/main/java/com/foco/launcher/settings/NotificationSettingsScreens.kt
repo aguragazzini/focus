@@ -1,7 +1,6 @@
 package com.foco.launcher.settings
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -17,13 +16,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -104,7 +100,6 @@ fun AvisosScreen(
     onToggleFilter: (Boolean) -> Unit,
     onOpenNlsSettings: () -> Unit,
     onSetNotifAllowed: (String, Boolean) -> Unit,
-    onOpenAvisosAdd: () -> Unit,
     onNlsMessageShown: () -> Unit,
 ) {
     val snackbar = remember { SnackbarHostState() }
@@ -130,19 +125,12 @@ fun AvisosScreen(
                 ),
             )
         },
-        floatingActionButton = {
-            if (state.nlsActive) {
-                FloatingActionButton(onClick = onOpenAvisosAdd) {
-                    Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.nls_add))
-                }
-            }
-        },
     ) { padding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = PaddingValues(bottom = 88.dp),
+            contentPadding = PaddingValues(bottom = 32.dp),
         ) {
             item {
                 Row(
@@ -278,80 +266,6 @@ fun AvisosScreen(
                         text = stringResource(R.string.nls_preserve),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AvisosAddScreen(
-    state: SettingsUiState,
-    onBack: () -> Unit,
-    onToggle: (String) -> Unit,
-    onConfirm: () -> Unit,
-) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        topBar = {
-            TopAppBar(
-                title = { Text(stringResource(R.string.nls_add)) },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background,
-                    titleContentColor = MaterialTheme.colorScheme.onBackground,
-                ),
-            )
-        },
-        bottomBar = {
-            Button(
-                onClick = onConfirm,
-                enabled = state.pendingAvisosAdd.isNotEmpty(),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-            ) {
-                Text(stringResource(R.string.add_done))
-            }
-        },
-    ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding),
-        ) {
-            items(state.avisosCatalog, key = { it.packageName }) { app ->
-                val bitmap = remember(app.packageName, app.icon) { app.icon.asImageBitmap() }
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onToggle(app.packageName) }
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Checkbox(
-                        checked = app.packageName in state.pendingAvisosAdd,
-                        onCheckedChange = { onToggle(app.packageName) },
-                    )
-                    Image(
-                        bitmap = bitmap,
-                        contentDescription = app.label,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                        contentScale = ContentScale.Fit,
-                    )
-                    Text(
-                        text = app.label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(start = 12.dp),
                     )
                 }
             }

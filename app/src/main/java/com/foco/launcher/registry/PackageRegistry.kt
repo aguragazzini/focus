@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import com.foco.launcher.BuildConfig
-import com.foco.launcher.notification.NotificationAllowlistStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -21,7 +20,6 @@ import java.util.concurrent.atomic.AtomicReference
 class PackageRegistry(
     context: Context,
     private val prefsStore: PrefsStore,
-    private val notificationAllowlistStore: NotificationAllowlistStore,
 ) {
     private val appContext = context.applicationContext
     private val pm: PackageManager = appContext.packageManager
@@ -113,7 +111,6 @@ class PackageRegistry(
                         prefsStore.update { prefs ->
                             prefs.copy(entries = WhitelistMutations.remove(prefs.entries, packageName))
                         }
-                        notificationAllowlistStore.remove(packageName)
                     }
                 }
             }

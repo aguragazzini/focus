@@ -45,9 +45,6 @@ class SettingsActivity : ComponentActivity() {
                     onOpenNlsSettings = { NlsStatus.openListenerSettings(this) },
                     onSkipNls = vm::skipNlsOnboarding,
                     onSetNotifAllowed = vm::setNotifAllowed,
-                    onOpenAvisosAdd = vm::openAvisosAdd,
-                    onTogglePendingAvisos = vm::togglePendingAvisos,
-                    onConfirmAvisosAdd = vm::confirmAvisosAdd,
                     onNlsMessageShown = vm::clearNlsMessage,
                 )
             }

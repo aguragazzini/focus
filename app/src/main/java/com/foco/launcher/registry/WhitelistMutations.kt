@@ -5,10 +5,11 @@ object WhitelistMutations {
         entries: List<WhitelistEntry>,
         packageName: String,
         bioEnabled: Boolean = true,
+        allowNotif: Boolean = true,
     ): List<WhitelistEntry> {
         if (entries.any { it.packageName == packageName }) return entries
         val order = (entries.maxOfOrNull { it.order } ?: -1) + 1
-        return (entries + WhitelistEntry(packageName, order, bioEnabled)).normalized()
+        return (entries + WhitelistEntry(packageName, order, bioEnabled, allowNotif)).normalized()
     }
 
     fun addAll(

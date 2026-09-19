@@ -36,17 +36,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             combine(
                 app.prefsStore.prefs,
                 app.registry.launchables,
-                app.notificationAllowlistStore.prefs,
                 message,
                 resumeTick,
-            ) { prefs, _, notif, msg, _ ->
+            ) { prefs, _, msg, _ ->
                 HomeUiState(
                     ready = true,
                     setupDone = prefs.setupDone,
                     isDefaultHome = LaunchController.isDefaultHome(getApplication()),
                     apps = visible(prefs),
                     message = msg,
-                    nlsNeedsGrant = notif.nlsFilterEnabled && !com.foco.launcher.notification.NlsStatus.isGranted(getApplication()),
+                    nlsNeedsGrant = prefs.nlsFilterEnabled &&
+                        !com.foco.launcher.notification.NlsStatus.isGranted(getApplication()),
                 )
             }.collect { _state.value = it }
         }

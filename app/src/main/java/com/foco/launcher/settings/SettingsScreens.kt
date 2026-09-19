@@ -68,9 +68,6 @@ fun SettingsHost(
     onOpenNlsSettings: () -> Unit,
     onSkipNls: () -> Unit,
     onSetNotifAllowed: (String, Boolean) -> Unit,
-    onOpenAvisosAdd: () -> Unit,
-    onTogglePendingAvisos: (String) -> Unit,
-    onConfirmAvisosAdd: () -> Unit,
     onNlsMessageShown: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
@@ -103,14 +100,7 @@ fun SettingsHost(
             onToggleFilter = onToggleFilter,
             onOpenNlsSettings = onOpenNlsSettings,
             onSetNotifAllowed = onSetNotifAllowed,
-            onOpenAvisosAdd = onOpenAvisosAdd,
             onNlsMessageShown = onNlsMessageShown,
-        )
-        SettingsDest.AvisosAdd -> AvisosAddScreen(
-            state = state,
-            onBack = onBack,
-            onToggle = onTogglePendingAvisos,
-            onConfirm = onConfirmAvisosAdd,
         )
         SettingsDest.NlsOnboarding -> NlsOnboardingScreen(
             onOpenSettings = onOpenNlsSettings,

@@ -7,4 +7,5 @@ data class NotificationAllowlistPrefs(
     val nlsFilterEnabled: Boolean = false,
     val packages: Set<String> = emptySet(),
     val seededFromHome: Boolean = false,
+    val migratedToLauncherPrefs: Boolean = false,
 )
