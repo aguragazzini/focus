@@ -11,7 +11,10 @@ captures/
 *.class
 .DS_Store
 uploads/
-dist/
+# APK binaries stay out of git (no LFS). dist/README.md is tracked.
+dist/*.apk
+dist/*.apk.b64
+dist/*.apk.tar.gz
 *.log
 .kotlin/
 app/release/
