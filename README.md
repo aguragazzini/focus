@@ -75,23 +75,16 @@ El filtro es del **perfil personal**. Las notificaciones del **perfil de trabajo
 - Settings **Avisos** + onboarding NLS (copy ES-AR).
 - Work profile: PASS always (`sbn.user` / UserHandle). Sin Device Admin / DPM / Accessibility. Sin inbox. Sin bio.
 
-- Un solo módulo Gradle `:app` (`core/`, `registry/`, `security/` stub, `settings/`).
-- Home Compose: solo whitelist (vacía al instalar).
-- Tap → `getLaunchIntentForPackage` / component explícito. **Sin bio.**
-- DataStore: `WhitelistEntry(packageName, order, bioEnabled=true)` y `LauncherPrefs(setupDone, biometricGlobalEnabled, entries)`.
-- `PackageChangeReceiver`: invalida cache; **nunca** auto-agrega; desinstalación limpia huérfanos.
-- `<queries>` MAIN/LAUNCHER. No `QUERY_ALL_PACKAGES`.
-
 ## Fuera de este corte
 
 BiometricPrompt (s2b HOLD), Accessibility, Device Admin, inbox de notifs, multi-module Gradle, Play Store.
 
-Informe semana 1 vs checklist: [`docs/WEEK1-REPORT.md`](docs/WEEK1-REPORT.md).  
-Publicar en GitHub: [`PUSH.md`](PUSH.md).
+Informe NLS vs arch §0: [`docs/WEEK2A-NLS-REPORT.md`](docs/WEEK2A-NLS-REPORT.md).  
+Informe semana 1: [`docs/WEEK1-REPORT.md`](docs/WEEK1-REPORT.md).
 
 ## Documentos canónicos
 
-En `docs/`: arquitectura v1 (techo), notes Android (checklist), OK Andrés semana 1, UX v1 (copy ES-AR), decisiones de producto, spec funcional.
+En `docs/`: arquitectura v1, delta NLS v0, notes NLS, UX onboarding NLS, UX v1, decisiones, spec funcional.
 
 ## Licencia
 
