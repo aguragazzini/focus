@@ -55,6 +55,9 @@ class LauncherActivity : ComponentActivity() {
                     onChooseDefault = {
                         LaunchController.openHomePicker(this)
                     },
+                    onOpenAvisos = {
+                        startActivity(SettingsActivity.intent(this, SettingsActivity.DEST_AVISOS))
+                    },
                     onMessageShown = vm::clearMessage,
                 )
             }

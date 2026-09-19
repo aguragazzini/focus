@@ -1,9 +1,9 @@
 # Foco Launcher
 
-HOME launcher de lista blanca para Android. Kotlin + Jetpack Compose. Sin backend, sin Accessibility, sin NotificationListener.
+HOME launcher de lista blanca para Android. Kotlin + Jetpack Compose. Sin backend, sin Accessibility.
 
 Package: `com.foco.launcher`  
-Versión: `0.1.0-w1` (semana 1: se puede vivir, **sin** BiometricPrompt)
+Versión: `0.2.0` (semana 2a: filtro de avisos personal · **sin** BiometricPrompt)
 
 Solo ves las apps que elegís. El resto no aparece.
 
@@ -25,13 +25,8 @@ El APK de debug lo firma Gradle con el keystore de debug **local** (`~/.android/
 app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Copia de entrega (mismo binario): `foco-launcher-v0.1-w1.apk`.
-
-SHA256 de la entrega week-1:
-
-```
-27aa77968b7ecc46380fd94f1d5d89db13bbcf70eb482dc88c05654c4b4343e7
-```
+Copia de entrega week-1 (histórico): `foco-launcher-v0.1-w1.apk`.  
+Entrega actual (NLS): `foco-launcher-v0.2-nls.apk` — ver Artifacts / `dist/TRANSFER.md`.
 
 ## Sideload en Motorola (Edge 30 y modelos cercanos)
 
@@ -64,7 +59,21 @@ adb shell am start -a android.intent.action.VIEW -d foco://settings -n com.foco.
 - En Ajustes de Foco: **Volver al launcher anterior** abre otra vez el picker de inicio.
 - Último recurso: modo seguro, desinstalar `com.foco.launcher`, o **Apps predeterminadas → Inicio**.
 
-## Qué hay en semana 1
+### Filtro de avisos (semana 2a)
+
+No hace falta para ser launcher. En **Ajustes → Notificaciones** prendé **Silenciar otras notificaciones**. Android pide acceso a notificaciones; en la lista, activá **Foco**.
+
+En Motorola: **Ajustes → Notificaciones → acceso / apps con acceso**.
+
+El filtro es del **perfil personal**. Las notificaciones del **perfil de trabajo no se tocan**. Llamadas, alarmas, navegación y media en curso no se silencian. Sin el permiso del sistema, el filtro no se presenta como activo.
+
+## Qué hay en 0.2.0 (semana 2a)
+
+- Todo lo de semana 1, más `FocoNotificationListener` + `NotificationPolicy.shouldSuppress`.
+- DataStore **separado**: `notificationAllowlist` ≠ whitelist del home. Seed 1× opcional desde home.
+- Flag `nlsFilterEnabled`. **No** gatea ROLE_HOME.
+- Settings **Avisos** + onboarding NLS (copy ES-AR).
+- Work profile: PASS always (`sbn.user` / UserHandle). Sin Device Admin / DPM / Accessibility. Sin inbox. Sin bio.
 
 - Un solo módulo Gradle `:app` (`core/`, `registry/`, `security/` stub, `settings/`).
 - Home Compose: solo whitelist (vacía al instalar).
@@ -73,9 +82,9 @@ adb shell am start -a android.intent.action.VIEW -d foco://settings -n com.foco.
 - `PackageChangeReceiver`: invalida cache; **nunca** auto-agrega; desinstalación limpia huérfanos.
 - `<queries>` MAIN/LAUNCHER. No `QUERY_ALL_PACKAGES`.
 
-## Fuera de semana 1
+## Fuera de este corte
 
-BiometricPrompt, NotificationListener, Accessibility, multi-module Gradle, Play Store.
+BiometricPrompt (s2b HOLD), Accessibility, Device Admin, inbox de notifs, multi-module Gradle, Play Store.
 
 Informe semana 1 vs checklist: [`docs/WEEK1-REPORT.md`](docs/WEEK1-REPORT.md).  
 Publicar en GitHub: [`PUSH.md`](PUSH.md).

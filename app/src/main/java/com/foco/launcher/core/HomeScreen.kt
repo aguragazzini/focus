@@ -65,6 +65,7 @@ fun HomeScreen(
     onEditApps: () -> Unit,
     onAddApps: () -> Unit,
     onChooseDefault: () -> Unit,
+    onOpenAvisos: () -> Unit,
     onMessageShown: () -> Unit,
 ) {
     val snackbar = remember { SnackbarHostState() }
@@ -103,6 +104,9 @@ fun HomeScreen(
 
                 if (state.setupDone && !state.isDefaultHome) {
                     NotDefaultBanner(onChooseDefault)
+                }
+                if (state.nlsNeedsGrant) {
+                    NlsOffBanner(onOpenAvisos)
                 }
 
                 if (state.apps.isEmpty()) {
@@ -205,6 +209,29 @@ private fun NotDefaultBanner(onChooseDefault: () -> Unit) {
         )
         TextButton(onClick = onChooseDefault) {
             Text(stringResource(R.string.banner_choose))
+        }
+    }
+}
+
+@Composable
+private fun NlsOffBanner(onOpenAvisos: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.nls_banner),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        TextButton(onClick = onOpenAvisos) {
+            Text(stringResource(R.string.nls_banner_cta))
         }
     }
 }

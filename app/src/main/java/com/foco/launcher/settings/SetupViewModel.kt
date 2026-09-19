@@ -75,6 +75,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
             app.prefsStore.update { prefs ->
                 prefs.copy(entries = WhitelistMutations.addAll(emptyList(), packages))
             }
+            app.notificationAllowlistStore.addAll(snapshot.selected)
             _state.update {
                 it.copy(
                     step = SetupStep.SetDefault,

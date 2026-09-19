@@ -12,6 +12,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foco.launcher.FocoApp
 import com.foco.launcher.core.FocoTheme
 import com.foco.launcher.core.LaunchController
+import com.foco.launcher.notification.NlsStatus
 
 class SettingsActivity : ComponentActivity() {
     private val vm: SettingsViewModel by viewModels { SettingsViewModel.factory(application as FocoApp) }
@@ -30,6 +31,7 @@ class SettingsActivity : ComponentActivity() {
                     },
                     onOpenEdit = vm::openEdit,
                     onOpenAdd = vm::openAdd,
+                    onOpenAvisos = vm::openAvisos,
                     onChooseDefault = { LaunchController.openHomePicker(this) },
                     onOpenSystemSettings = { LaunchController.openSystemSettings(this) },
                     onToggleAdd = vm::togglePending,
@@ -39,6 +41,14 @@ class SettingsActivity : ComponentActivity() {
                     onDismissRemove = vm::dismissRemove,
                     onMoveUp = { vm.move(it, -1) },
                     onMoveDown = { vm.move(it, 1) },
+                    onToggleFilter = vm::requestEnableFilter,
+                    onOpenNlsSettings = { NlsStatus.openListenerSettings(this) },
+                    onSkipNls = vm::skipNlsOnboarding,
+                    onSetNotifAllowed = vm::setNotifAllowed,
+                    onOpenAvisosAdd = vm::openAvisosAdd,
+                    onTogglePendingAvisos = vm::togglePendingAvisos,
+                    onConfirmAvisosAdd = vm::confirmAvisosAdd,
+                    onNlsMessageShown = vm::clearNlsMessage,
                 )
             }
         }
@@ -53,6 +63,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         vm.refreshDefault(LaunchController.isDefaultHome(this))
+        vm.refreshNls()
         (application as FocoApp).registry.refreshIfPackagesChanged()
         (application as FocoApp).registry.invalidate()
     }
@@ -62,6 +73,8 @@ class SettingsActivity : ComponentActivity() {
         const val DEST_MAIN = "main"
         const val DEST_EDIT = "edit"
         const val DEST_ADD = "add"
+        const val DEST_AVISOS = "avisos"
+        const val DEST_NLS_ONBOARDING = "nls"
 
         fun intent(context: Context, dest: String = DEST_MAIN): Intent {
             return Intent(context, SettingsActivity::class.java).putExtra(EXTRA_DEST, dest)

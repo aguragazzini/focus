@@ -1,48 +1,35 @@
-# Transfer — Foco Launcher week-1 APK
+# Transfer — Foco Launcher 0.2.0 NLS (semana 2a)
 
-The 17MB debug APK is **not** in git. Pull it from this cloud agent’s Artifacts panel (a logged-in Cursor session), then copy it onto the shared box filesystem.
+APK **not** in git. Download from this agent’s Artifacts panel.
 
 ## SHA256
 
 ```
-27aa77968b7ecc46380fd94f1d5d89db13bbcf70eb482dc88c05654c4b4343e7
+7457448c07da8dbc534b9836332070e6072e424cb81837172064f0d8d6747dad
 ```
 
 | File | Path |
 |------|------|
-| APK | `/opt/cursor/artifacts/foco-launcher-v0.1-w1.apk` |
-| base64 (one line) | `/opt/cursor/artifacts/foco-launcher-v0.1-w1.apk.b64` |
-| tar.gz | `/opt/cursor/artifacts/foco-launcher-v0.1-w1.apk.tar.gz` |
+| APK | `/opt/cursor/artifacts/foco-launcher-v0.2-nls.apk` |
+| base64 | `/opt/cursor/artifacts/foco-launcher-v0.2-nls.apk.b64` |
 
-Package `com.foco.launcher` · `0.1.0-w1` · Gradle **debug** keystore (local only).
+Package `com.foco.launcher` · `0.2.0` (versionCode 2) · Gradle debug keystore (local).
 
-## Exact click-path
+## Click-path
 
-1. Open the agent run:  
-   https://cursor.com/agents/bc-fbe12aee-5f70-57d1-bfb2-e8398ea93c2e
-2. Click **Artifacts**.
-3. Click **`foco-launcher-v0.1-w1.apk`** and download it.  
-   Deep link:  
-   https://cursor.com/agents/bc-fbe12aee-5f70-57d1-bfb2-e8398ea93c2e/artifacts?path=%2Fopt%2Fcursor%2Fartifacts%2Ffoco-launcher-v0.1-w1.apk
-4. Copy that file into the shared box (USB, `scp`, Files, etc.). The Artifacts UI itself cannot write through an auth wall into that box.
-5. Verify:
+1. Open https://cursor.com/agents/bc-fbe12aee-5f70-57d1-bfb2-e8398ea93c2e
+2. **Artifacts** → `foco-launcher-v0.2-nls.apk`
+3. Deep link: https://cursor.com/agents/bc-fbe12aee-5f70-57d1-bfb2-e8398ea93c2e/artifacts?path=%2Fopt%2Fcursor%2Fartifacts%2Ffoco-launcher-v0.2-nls.apk
+4. Verify `sha256sum` matches the hash above.
 
-```bash
-sha256sum foco-launcher-v0.1-w1.apk
-# 27aa77968b7ecc46380fd94f1d5d89db13bbcf70eb482dc88c05654c4b4343e7
-```
-
-## Origin URL (source of truth)
+## Origin
 
 https://origin.cursor.com/git/agust-n-ragazzini/tmp-2c3ab32c79db0e54
-
-GitHub public `foco-launcher`: not created from this agent (`gh` has no GitHub token here). When an empty public repo URL is pasted in chat, `main` can be pushed there. Until then, Origin is the source of truth.
 
 ## Sideload
 
 ```bash
-adb install -r foco-launcher-v0.1-w1.apk
+adb install -r foco-launcher-v0.2-nls.apk
 ```
 
-Then: open Foco → setup (≥1 app, Settings suggested) → Default apps → Home → Foco.  
-Escape: `adb shell am start -a android.intent.action.VIEW -d foco://settings`
+NLS is **optional** after Foco is home: Ajustes → Notificaciones → Silenciar otras notificaciones → activá Foco en acceso a notificaciones. Motorola: Ajustes → Notificaciones → acceso / apps con acceso. Work profile notifs are never filtered.

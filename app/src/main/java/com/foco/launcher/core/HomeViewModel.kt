@@ -20,6 +20,7 @@ data class HomeUiState(
     val isDefaultHome: Boolean = false,
     val apps: List<LaunchableApp> = emptyList(),
     val message: String? = null,
+    val nlsNeedsGrant: Boolean = false,
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -35,19 +36,19 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             combine(
                 app.prefsStore.prefs,
                 app.registry.launchables,
+                app.notificationAllowlistStore.prefs,
                 message,
                 resumeTick,
-            ) { prefs, _, msg, _ ->
-                Triple(prefs, visible(prefs), msg)
-            }.collect { (prefs, apps, msg) ->
-                _state.value = HomeUiState(
+            ) { prefs, _, notif, msg, _ ->
+                HomeUiState(
                     ready = true,
                     setupDone = prefs.setupDone,
                     isDefaultHome = LaunchController.isDefaultHome(getApplication()),
-                    apps = apps,
+                    apps = visible(prefs),
                     message = msg,
+                    nlsNeedsGrant = notif.nlsFilterEnabled && !com.foco.launcher.notification.NlsStatus.isGranted(getApplication()),
                 )
-            }
+            }.collect { _state.value = it }
         }
     }
 

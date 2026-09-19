@@ -54,6 +54,7 @@ fun SettingsHost(
     onBack: () -> Unit,
     onOpenEdit: () -> Unit,
     onOpenAdd: () -> Unit,
+    onOpenAvisos: () -> Unit,
     onChooseDefault: () -> Unit,
     onOpenSystemSettings: () -> Unit,
     onToggleAdd: (String) -> Unit,
@@ -63,6 +64,14 @@ fun SettingsHost(
     onDismissRemove: () -> Unit,
     onMoveUp: (String) -> Unit,
     onMoveDown: (String) -> Unit,
+    onToggleFilter: (Boolean) -> Unit,
+    onOpenNlsSettings: () -> Unit,
+    onSkipNls: () -> Unit,
+    onSetNotifAllowed: (String, Boolean) -> Unit,
+    onOpenAvisosAdd: () -> Unit,
+    onTogglePendingAvisos: (String) -> Unit,
+    onConfirmAvisosAdd: () -> Unit,
+    onNlsMessageShown: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -70,6 +79,7 @@ fun SettingsHost(
             state = state,
             onBack = onBack,
             onOpenEdit = onOpenEdit,
+            onOpenAvisos = onOpenAvisos,
             onChooseDefault = onChooseDefault,
             onOpenSystemSettings = onOpenSystemSettings,
         )
@@ -86,6 +96,25 @@ fun SettingsHost(
             onBack = onBack,
             onToggleAdd = onToggleAdd,
             onConfirmAdd = onConfirmAdd,
+        )
+        SettingsDest.Avisos -> AvisosScreen(
+            state = state,
+            onBack = onBack,
+            onToggleFilter = onToggleFilter,
+            onOpenNlsSettings = onOpenNlsSettings,
+            onSetNotifAllowed = onSetNotifAllowed,
+            onOpenAvisosAdd = onOpenAvisosAdd,
+            onNlsMessageShown = onNlsMessageShown,
+        )
+        SettingsDest.AvisosAdd -> AvisosAddScreen(
+            state = state,
+            onBack = onBack,
+            onToggle = onTogglePendingAvisos,
+            onConfirm = onConfirmAvisosAdd,
+        )
+        SettingsDest.NlsOnboarding -> NlsOnboardingScreen(
+            onOpenSettings = onOpenNlsSettings,
+            onSkip = onSkipNls,
         )
     }
     if (state.removeCandidate != null) {
@@ -104,6 +133,7 @@ private fun SettingsMain(
     state: SettingsUiState,
     onBack: () -> Unit,
     onOpenEdit: () -> Unit,
+    onOpenAvisos: () -> Unit,
     onChooseDefault: () -> Unit,
     onOpenSystemSettings: () -> Unit,
 ) {
@@ -132,6 +162,12 @@ private fun SettingsMain(
         ) {
             item {
                 SettingsRow(stringResource(R.string.settings_apps), onClick = onOpenEdit)
+                HorizontalDivider()
+                SettingsRow(
+                    title = stringResource(R.string.settings_notifications),
+                    subtitle = stringResource(R.string.settings_notifications_sub),
+                    onClick = onOpenAvisos,
+                )
                 HorizontalDivider()
                 SettingsRow(stringResource(R.string.settings_default), onClick = onChooseDefault)
                 HorizontalDivider()
@@ -166,16 +202,23 @@ private fun SettingsMain(
 }
 
 @Composable
-private fun SettingsRow(title: String, onClick: () -> Unit) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onBackground,
+private fun SettingsRow(title: String, onClick: () -> Unit, subtitle: String? = null) {
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 18.dp),
-    )
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        if (subtitle != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -62,8 +62,33 @@
     <string name="settings_previous_launcher">Volver al launcher anterior</string>
     <string name="settings_system">Ajustes del teléfono</string>
     <string name="settings_version">Versión</string>
-    <string name="settings_about_body">La huella, cuando esté, cubre lo que abrís desde Foco. No cubre notificaciones ni links.</string>
-    <string name="settings_week1_note">Semana 1: las apps se abren directo, sin huella.</string>
+    <string name="settings_week1_note">Semana 2a: filtro de avisos del perfil personal. Sin huella todavía.</string>
+    <string name="settings_about_body">El filtro de avisos cubre el perfil personal. El perfil de trabajo no se toca. La huella, cuando esté, cubre lo que abrís desde Foco.</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_notifications_sub">Perfil personal · work sin tocar</string>
+
+    <string name="nls_service_label">Foco</string>
+    <string name="nls_title">Notificaciones</string>
+    <string name="nls_body">Foco puede silenciar avisos de apps que no elegiste. Las de tu lista siguen igual.</string>
+    <string name="nls_how">Android pide permiso de acceso a notificaciones. En la lista, activá Foco.</string>
+    <string name="nls_cta">Abrir Ajustes</string>
+    <string name="nls_skip">Ahora no</string>
+    <string name="nls_pending">Todavía no está activo. Activá Foco en la lista.</string>
+    <string name="nls_done">Listo.</string>
+    <string name="nls_toggle">Silenciar otras notificaciones</string>
+    <string name="nls_master_sub">En el perfil personal, solo avisan las apps que marques abajo.</string>
+    <string name="nls_moto_hint">En Motorola: Ajustes → Notificaciones → acceso / apps con acceso.</string>
+    <string name="nls_missing_permission">Falta el permiso del sistema.</string>
+    <string name="nls_section">Apps que pueden avisar</string>
+    <string name="nls_footer">Las apps que no están en Foco no avisan.</string>
+    <string name="nls_personal_only">Esta lista es del perfil personal.</string>
+    <string name="nls_work_title">Perfil de trabajo</string>
+    <string name="nls_work_body">Foco no gestiona el perfil de trabajo. Esas notificaciones siguen llegando con normalidad.</string>
+    <string name="nls_preserve">Llamadas, alarmas, navegación y media en curso no las silenciamos.</string>
+    <string name="nls_add">Sumar app a avisos</string>
+    <string name="nls_banner">Filtro de avisos off</string>
+    <string name="nls_banner_cta">Activar</string>
+    <string name="nls_inactive">El filtro no está activo sin el permiso del sistema.</string>
 
     <string name="cd_app_icon">Ícono</string>
 </resources>

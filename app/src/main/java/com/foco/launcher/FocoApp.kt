@@ -1,6 +1,8 @@
 package com.foco.launcher
 
 import android.app.Application
+import com.foco.launcher.notification.NotificationAllowlistStore
+import com.foco.launcher.notification.NotificationPolicyEngine
 import com.foco.launcher.registry.PackageRegistry
 import com.foco.launcher.registry.PrefsStore
 
@@ -9,10 +11,16 @@ class FocoApp : Application() {
         private set
     lateinit var registry: PackageRegistry
         private set
+    lateinit var notificationAllowlistStore: NotificationAllowlistStore
+        private set
+    lateinit var notificationPolicy: NotificationPolicyEngine
+        private set
 
     override fun onCreate() {
         super.onCreate()
         prefsStore = PrefsStore(this)
-        registry = PackageRegistry(this, prefsStore)
+        notificationAllowlistStore = NotificationAllowlistStore(this)
+        registry = PackageRegistry(this, prefsStore, notificationAllowlistStore)
+        notificationPolicy = NotificationPolicyEngine(this, notificationAllowlistStore)
     }
 }
