@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Foco" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@color/foco_background</item>
+        <item name="android:navigationBarColor">@color/foco_background</item>
+        <item name="android:windowBackground">@color/foco_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorPrimary">@color/foco_icon_ring</item>
+    </style>
+
+    <style name="Theme.Foco.Launcher" parent="Theme.Foco">
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowBackground">@color/foco_background</item>
+    </style>
+</resources>

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Foco</string>
+
+    <string name="welcome_title">Foco</string>
+    <string name="welcome_body">Solo ves las apps que elegís.\nEl resto no aparece.</string>
+    <string name="welcome_cta">Empezar</string>
+
+    <string name="setup_title">Elegí lo esencial</string>
+    <string name="setup_sub">Después podés sumar o sacar.</string>
+    <string name="setup_continue">Continuar</string>
+    <string name="setup_suggested_phone">Teléfono</string>
+    <string name="setup_suggested_settings">Ajustes</string>
+    <string name="setup_suggested_messages">Mensajes</string>
+    <string name="setup_suggested_camera">Cámara</string>
+    <string name="setup_other_apps">Otras apps</string>
+    <string name="setup_need_settings">Sumá Ajustes a la lista para poder elegir Foco como inicio.</string>
+
+    <string name="default_title">Usar Foco como inicio</string>
+    <string name="default_body">Así, al tocar Inicio, ves solo tu lista.</string>
+    <string name="default_cta">Elegir como inicio</string>
+    <string name="default_skip">Ahora no</string>
+    <string name="default_blocked">Necesitás Ajustes del teléfono en la lista para no quedar afuera.</string>
+    <string name="default_already">Foco ya es el inicio.</string>
+
+    <string name="banner_not_default">Todavía no es el inicio del teléfono.</string>
+    <string name="banner_choose">Elegir</string>
+
+    <string name="home_empty">No hay apps todavía.</string>
+    <string name="home_add">Agregar apps</string>
+    <string name="home_overflow">Más opciones</string>
+    <string name="home_open_settings">Ajustes</string>
+    <string name="home_edit_apps">Editar apps</string>
+    <string name="home_system_settings">Ajustes del teléfono</string>
+    <string name="cd_settings">Ajustes de Foco</string>
+
+    <string name="edit_title">Apps visibles</string>
+    <string name="edit_done">Listo</string>
+    <string name="edit_add">Agregar app</string>
+    <string name="edit_move_up">Subir</string>
+    <string name="edit_move_down">Bajar</string>
+    <string name="edit_remove">Sacar</string>
+    <string name="edit_empty">La lista está vacía.</string>
+
+    <string name="add_title">Agregar apps</string>
+    <string name="add_done">Agregar</string>
+    <string name="add_empty">No hay más apps para sumar.</string>
+    <string name="add_cancel">Cancelar</string>
+
+    <string name="remove_last_warn">Si sacás la última app, el inicio queda vacío.</string>
+    <string name="remove_settings_warn">Sin Ajustes del teléfono puede costarte salir. ¿Sacar igual?</string>
+    <string name="remove_cancel">Cancelar</string>
+    <string name="remove_confirm">Sacar</string>
+    <string name="remove_settings_keep">Dejar Ajustes</string>
+    <string name="remove_settings_confirm">Sacar igual</string>
+
+    <string name="open_fail">No se abrió.</string>
+
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_apps">Apps visibles</string>
+    <string name="settings_default">Elegir como inicio</string>
+    <string name="settings_previous_launcher">Volver al launcher anterior</string>
+    <string name="settings_system">Ajustes del teléfono</string>
+    <string name="settings_version">Versión</string>
+    <string name="settings_about_body">La huella, cuando esté, cubre lo que abrís desde Foco. No cubre notificaciones ni links.</string>
+    <string name="settings_week1_note">Semana 1: las apps se abren directo, sin huella.</string>
+
+    <string name="cd_app_icon">Ícono</string>
+</resources>
