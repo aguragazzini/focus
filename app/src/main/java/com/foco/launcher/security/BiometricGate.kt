@@ -1,14 +1,18 @@
 package com.foco.launcher.security
 
 /**
- * BiometricPrompt gate — semana 2.
+ * BiometricPrompt gate.
  *
- * Semana 1: el launch path en [com.foco.launcher.core] ignora bio.
- * No hay UI, no hay androidx.biometric, no se almacena biometría.
- *
- * `WhitelistEntry.bioEnabled` se persiste (default true al agregar;
- * Teléfono sugerido false) para no migrar datos en s2.
+ * The launch path in [com.foco.launcher.core] ignores biometrics while
+ * [ENABLED_IN_LAUNCH_PATH] is false. No biometric UI is shown in that state.
+ * Stored `bioEnabled` defaults stay false so prefs do not claim a prompt
+ * the launcher does not run.
  */
 object BiometricGate {
     const val ENABLED_IN_LAUNCH_PATH: Boolean = false
+
+    fun defaultBioEnabled(isPhone: Boolean): Boolean {
+        if (!ENABLED_IN_LAUNCH_PATH) return false
+        return !isPhone
+    }
 }

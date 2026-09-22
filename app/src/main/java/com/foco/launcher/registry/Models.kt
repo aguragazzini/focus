@@ -6,14 +6,14 @@ import kotlinx.serialization.Serializable
 data class WhitelistEntry(
     val packageName: String,
     val order: Int,
-    val bioEnabled: Boolean = true,
+    val bioEnabled: Boolean = false,
     val allowNotif: Boolean = true,
 )
 
 @Serializable
 data class LauncherPrefs(
     val setupDone: Boolean = false,
-    val biometricGlobalEnabled: Boolean = true,
+    val biometricGlobalEnabled: Boolean = false,
     val entries: List<WhitelistEntry> = emptyList(),
     val nlsFilterEnabled: Boolean = false,
 ) {

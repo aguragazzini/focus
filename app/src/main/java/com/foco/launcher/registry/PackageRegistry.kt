@@ -29,6 +29,9 @@ class PackageRegistry(
     private val _launchables = MutableStateFlow<List<LaunchableApp>>(emptyList())
     val launchables: StateFlow<List<LaunchableApp>> = _launchables.asStateFlow()
 
+    private val _loaded = MutableStateFlow(false)
+    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
     init {
         scope.launch { reload() }
     }
@@ -123,6 +126,7 @@ class PackageRegistry(
         val loaded = queryLaunchables()
         cache.set(loaded)
         _launchables.value = loaded
+        _loaded.value = true
         loaded
     }
 

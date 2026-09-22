@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.foco.launcher.FocoApp
+import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,12 +16,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
-    val ready: Boolean = false,
+    val prefsReady: Boolean = false,
+    val iconsReady: Boolean = false,
     val setupDone: Boolean = false,
     val isDefaultHome: Boolean = false,
     val apps: List<LaunchableApp> = emptyList(),
     val message: String? = null,
-    val nlsNeedsGrant: Boolean = false,
+    val banner: HomeBanner = HomeBanner.None,
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -36,17 +38,24 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             combine(
                 app.prefsStore.prefs,
                 app.registry.launchables,
+                app.registry.loaded,
                 message,
                 resumeTick,
-            ) { prefs, _, msg, _ ->
+            ) { prefs, all, iconsLoaded, msg, _ ->
+                val isDefault = LaunchController.isDefaultHome(getApplication())
+                val nlsNeedsGrant = prefs.nlsFilterEnabled && !NlsStatus.isGranted(getApplication())
                 HomeUiState(
-                    ready = true,
+                    prefsReady = true,
+                    iconsReady = iconsLoaded,
                     setupDone = prefs.setupDone,
-                    isDefaultHome = LaunchController.isDefaultHome(getApplication()),
-                    apps = visible(prefs),
+                    isDefaultHome = isDefault,
+                    apps = visible(prefs, all),
                     message = msg,
-                    nlsNeedsGrant = prefs.nlsFilterEnabled &&
-                        !com.foco.launcher.notification.NlsStatus.isGranted(getApplication()),
+                    banner = selectHomeBanner(
+                        setupDone = prefs.setupDone,
+                        isDefaultHome = isDefault,
+                        nlsNeedsGrant = nlsNeedsGrant,
+                    ),
                 )
             }.collect { _state.value = it }
         }
@@ -65,8 +74,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         message.value = null
     }
 
-    private suspend fun visible(prefs: LauncherPrefs): List<LaunchableApp> {
-        return app.registry.visibleApps(prefs)
+    private fun visible(prefs: LauncherPrefs, all: List<LaunchableApp>): List<LaunchableApp> {
+        if (all.isEmpty()) return emptyList()
+        val byPkg = all.associateBy { it.packageName }
+        return prefs.entries
+            .sortedBy { it.order }
+            .mapNotNull { byPkg[it.packageName] }
     }
 
     companion object {

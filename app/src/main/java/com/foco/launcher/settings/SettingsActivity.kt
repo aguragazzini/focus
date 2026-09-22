@@ -33,6 +33,7 @@ class SettingsActivity : ComponentActivity() {
                     onOpenAdd = vm::openAdd,
                     onOpenAvisos = vm::openAvisos,
                     onChooseDefault = { LaunchController.openHomePicker(this) },
+                    onOpenDefaultApps = { LaunchController.openDefaultAppsSettings(this) },
                     onOpenSystemSettings = { LaunchController.openSystemSettings(this) },
                     onToggleAdd = vm::togglePending,
                     onConfirmAdd = vm::confirmAdd,

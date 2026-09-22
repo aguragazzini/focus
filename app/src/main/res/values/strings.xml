@@ -13,21 +13,22 @@
     <string name="setup_suggested_settings">Ajustes</string>
     <string name="setup_suggested_messages">Mensajes</string>
     <string name="setup_suggested_camera">Cámara</string>
-    <string name="setup_other_apps">Otras apps</string>
     <string name="setup_need_settings">Sumá Ajustes a la lista para poder elegir Foco como inicio.</string>
 
     <string name="default_title">Usar Foco como inicio</string>
-    <string name="default_body">Así, al tocar Inicio, ves solo tu lista.</string>
+    <string name="default_body">Si no lo elegís, el teléfono sigue con el launcher anterior.</string>
     <string name="default_cta">Elegir como inicio</string>
     <string name="default_skip">Ahora no</string>
     <string name="default_blocked">Necesitás Ajustes del teléfono en la lista para no quedar afuera.</string>
     <string name="default_already">Foco ya es el inicio.</string>
 
-    <string name="banner_not_default">Todavía no es el inicio del teléfono.</string>
+    <string name="banner_not_default">Foco no es el inicio del teléfono.</string>
     <string name="banner_choose">Elegir</string>
 
-    <string name="home_empty">No hay apps todavía.</string>
-    <string name="home_add">Agregar apps</string>
+    <string name="home_empty">Todavía no hay apps en tu lista.</string>
+    <string name="home_empty_hint">Agregá las que querés ver.</string>
+    <string name="home_loading">Cargando</string>
+    <string name="home_add">Agregar</string>
     <string name="home_overflow">Más opciones</string>
     <string name="home_open_settings">Ajustes</string>
     <string name="home_edit_apps">Editar apps</string>
@@ -59,13 +60,13 @@
     <string name="settings_title">Ajustes</string>
     <string name="settings_apps">Apps visibles</string>
     <string name="settings_default">Elegir como inicio</string>
-    <string name="settings_previous_launcher">Volver al launcher anterior</string>
+    <string name="settings_previous_launcher">Apps predeterminadas</string>
+    <string name="settings_previous_sub">Para elegir otro inicio, incluido el launcher anterior.</string>
     <string name="settings_system">Ajustes del teléfono</string>
     <string name="settings_version">Versión</string>
-    <string name="settings_week1_note">Semana 2a: filtro de avisos del perfil personal. Sin huella todavía.</string>
-    <string name="settings_about_body">El filtro de avisos cubre el perfil personal. El perfil de trabajo no se toca. La huella, cuando esté, cubre lo que abrís desde Foco.</string>
+    <string name="settings_about_body">El filtro de avisos es del perfil personal. El perfil de trabajo no se toca.</string>
     <string name="settings_notifications">Notificaciones</string>
-    <string name="settings_notifications_sub">Perfil personal · work sin tocar</string>
+    <string name="settings_notifications_sub">Perfil personal. El de trabajo no se toca.</string>
 
     <string name="nls_service_label">Foco</string>
     <string name="nls_title">Notificaciones</string>
@@ -85,7 +86,7 @@
     <string name="nls_work_title">Perfil de trabajo</string>
     <string name="nls_work_body">Foco no gestiona el perfil de trabajo. Esas notificaciones siguen llegando con normalidad.</string>
     <string name="nls_preserve">Llamadas, alarmas, navegación y media en curso no las silenciamos.</string>
-    <string name="nls_banner">Filtro de avisos off</string>
+    <string name="nls_banner">Falta permiso para silenciar avisos.</string>
     <string name="nls_banner_cta">Activar</string>
     <string name="nls_inactive">El filtro no está activo sin el permiso del sistema.</string>
 

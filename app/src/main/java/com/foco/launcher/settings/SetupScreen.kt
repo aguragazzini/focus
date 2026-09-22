@@ -1,6 +1,5 @@
 package com.foco.launcher.settings
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,29 +13,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.foco.launcher.R
-import com.foco.launcher.registry.LaunchableApp
+import com.foco.launcher.core.FocoPrimaryButton
+import com.foco.launcher.core.FocoTextButton
 import com.foco.launcher.registry.SuggestedApp
 import com.foco.launcher.registry.SuggestedKind
 
@@ -87,7 +81,7 @@ private fun WelcomeStep(onStart: () -> Unit) {
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(40.dp))
-        Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
+        FocoPrimaryButton(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.welcome_cta))
         }
     }
@@ -123,28 +117,12 @@ private fun PickAppsStep(
                 SuggestedRow(
                     app = app,
                     checked = app.packageName in state.selected,
+                    locked = app.packageName == state.settingsPackage,
                     onToggle = { onToggle(app.packageName) },
                 )
             }
-            if (state.others.isNotEmpty()) {
-                item {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                    Text(
-                        text = stringResource(R.string.setup_other_apps),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 8.dp),
-                    )
-                }
-                items(state.others, key = { it.packageName }) { app ->
-                    LaunchableRow(
-                        app = app,
-                        checked = app.packageName in state.selected,
-                        onToggle = { onToggle(app.packageName) },
-                    )
-                }
-            }
         }
-        Button(
+        FocoPrimaryButton(
             onClick = onContinue,
             enabled = state.canContinue,
             modifier = Modifier.fillMaxWidth(),
@@ -188,12 +166,12 @@ private fun DefaultStep(
                 style = MaterialTheme.typography.bodyMedium,
                 textAlign = TextAlign.Center,
             )
-            TextButton(onClick = onBackToApps) {
+            FocoTextButton(onClick = onBackToApps) {
                 Text(stringResource(R.string.setup_need_settings))
             }
         }
         Spacer(Modifier.height(32.dp))
-        Button(
+        FocoPrimaryButton(
             onClick = onChooseDefault,
             enabled = state.canSetDefault,
             modifier = Modifier.fillMaxWidth(),
@@ -201,14 +179,22 @@ private fun DefaultStep(
             Text(stringResource(R.string.default_cta))
         }
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onSkipDefault) {
-            Text(stringResource(R.string.default_skip))
+        FocoTextButton(onClick = onSkipDefault) {
+            Text(
+                text = stringResource(R.string.default_skip),
+                style = MaterialTheme.typography.bodyMedium.copy(color = Color.Unspecified),
+            )
         }
     }
 }
 
 @Composable
-private fun SuggestedRow(app: SuggestedApp, checked: Boolean, onToggle: () -> Unit) {
+private fun SuggestedRow(
+    app: SuggestedApp,
+    checked: Boolean,
+    locked: Boolean,
+    onToggle: () -> Unit,
+) {
     val title = when (app.kind) {
         SuggestedKind.PHONE -> stringResource(R.string.setup_suggested_phone)
         SuggestedKind.SETTINGS -> stringResource(R.string.setup_suggested_settings)
@@ -219,46 +205,20 @@ private fun SuggestedRow(app: SuggestedApp, checked: Boolean, onToggle: () -> Un
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onToggle)
+            .clickable(enabled = !locked, onClick = onToggle)
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Checkbox(checked = checked, onCheckedChange = { onToggle() })
+        Checkbox(
+            checked = checked,
+            onCheckedChange = { if (!locked) onToggle() },
+            enabled = !locked,
+        )
         Column(modifier = Modifier.padding(start = 8.dp)) {
             Text(text = title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onBackground)
             if (app.label != title) {
                 Text(text = app.label, style = MaterialTheme.typography.bodyMedium)
             }
         }
-    }
-}
-
-@Composable
-private fun LaunchableRow(app: LaunchableApp, checked: Boolean, onToggle: () -> Unit) {
-    val bitmap = remember(app.packageName, app.icon) { app.icon.asImageBitmap() }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onToggle)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Checkbox(checked = checked, onCheckedChange = { onToggle() })
-        Image(
-            bitmap = bitmap,
-            contentDescription = app.label,
-            modifier = Modifier
-                .padding(start = 4.dp)
-                .size(36.dp)
-                .clip(RoundedCornerShape(8.dp)),
-            contentScale = ContentScale.Fit,
-        )
-        Text(
-            text = app.label,
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground,
-            modifier = Modifier.padding(start = 12.dp),
-        )
     }
 }
