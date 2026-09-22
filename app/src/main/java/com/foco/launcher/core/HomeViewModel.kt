@@ -36,27 +36,36 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     init {
         viewModelScope.launch {
             combine(
+                app.startupReady,
                 app.prefsStore.prefs,
                 app.registry.launchables,
                 app.registry.loaded,
-                message,
-                resumeTick,
-            ) { prefs, all, iconsLoaded, msg, _ ->
-                val isDefault = LaunchController.isDefaultHome(getApplication())
-                val nlsNeedsGrant = prefs.nlsFilterEnabled && !NlsStatus.isGranted(getApplication())
-                HomeUiState(
-                    prefsReady = true,
-                    iconsReady = iconsLoaded,
-                    setupDone = prefs.setupDone,
-                    isDefaultHome = isDefault,
-                    apps = visible(prefs, all),
-                    message = msg,
-                    banner = selectHomeBanner(
-                        setupDone = prefs.setupDone,
+            ) { startupReady, prefs, all, iconsLoaded ->
+                StartupSnap(startupReady, prefs, all, iconsLoaded)
+            }.combine(message) { snap, msg ->
+                snap to msg
+            }.combine(resumeTick) { pair, _ ->
+                val (snap, msg) = pair
+                if (!snap.startupReady) {
+                    HomeUiState(message = msg)
+                } else {
+                    val isDefault = LaunchController.isDefaultHome(getApplication())
+                    val nlsNeedsGrant = snap.prefs.nlsFilterEnabled &&
+                        !NlsStatus.isGranted(getApplication())
+                    HomeUiState(
+                        prefsReady = true,
+                        iconsReady = snap.iconsLoaded,
+                        setupDone = snap.prefs.setupDone,
                         isDefaultHome = isDefault,
-                        nlsNeedsGrant = nlsNeedsGrant,
-                    ),
-                )
+                        apps = visible(snap.prefs, snap.apps),
+                        message = msg,
+                        banner = selectHomeBanner(
+                            setupDone = snap.prefs.setupDone,
+                            isDefaultHome = isDefault,
+                            nlsNeedsGrant = nlsNeedsGrant,
+                        ),
+                    )
+                }
             }.collect { _state.value = it }
         }
     }
@@ -73,6 +82,13 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun clearMessage() {
         message.value = null
     }
+
+    private data class StartupSnap(
+        val startupReady: Boolean,
+        val prefs: LauncherPrefs,
+        val apps: List<LaunchableApp>,
+        val iconsLoaded: Boolean,
+    )
 
     private fun visible(prefs: LauncherPrefs, all: List<LaunchableApp>): List<LaunchableApp> {
         if (all.isEmpty()) return emptyList()

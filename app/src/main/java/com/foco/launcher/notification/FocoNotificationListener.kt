@@ -40,6 +40,8 @@ class FocoNotificationListener : NotificationListenerService() {
 
     private fun shouldSuppress(sbn: StatusBarNotification): Boolean {
         val app = applicationContext as? FocoApp ?: return false
+        // Fail open until migration finishes. Work profiles stay unfiltered either way.
+        if (!app.startupReady.value) return false
         return app.notificationPolicy.shouldSuppress(sbn)
     }
 }

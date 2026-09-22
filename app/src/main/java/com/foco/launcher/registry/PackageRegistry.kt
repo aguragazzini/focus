@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
 import android.util.Log
 import com.foco.launcher.BuildConfig
 import kotlinx.coroutines.CoroutineScope
@@ -14,6 +15,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicReference
 
@@ -25,19 +28,43 @@ class PackageRegistry(
     private val pm: PackageManager = appContext.packageManager
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val cache = AtomicReference<List<LaunchableApp>>(emptyList())
+    private val homeMutex = Mutex()
+    private val publishMutex = Mutex()
 
     private val _launchables = MutableStateFlow<List<LaunchableApp>>(emptyList())
     val launchables: StateFlow<List<LaunchableApp>> = _launchables.asStateFlow()
 
+    /** True once whitelist icons are published. Does not wait for the full catalog. */
     private val _loaded = MutableStateFlow(false)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
+    private val _catalogLoaded = MutableStateFlow(false)
+
     init {
-        scope.launch { reload() }
+        scope.launch {
+            warmHomeIcons()
+            warmCatalog(force = false)
+        }
+    }
+
+    /**
+     * Loads icons for the current whitelist only, off the caller thread.
+     * Safe to call from boot; a full-catalog scan is a separate step.
+     */
+    suspend fun warmHomeIcons() {
+        if (_loaded.value) return
+        homeMutex.withLock {
+            if (_loaded.value) return@withLock
+            val prefs = prefsStore.prefs.first()
+            val listed = withContext(Dispatchers.Default) {
+                loadListed(prefs.entries.map { it.packageName })
+            }
+            publishHome(listed)
+        }
     }
 
     fun invalidate() {
-        scope.launch { reload() }
+        scope.launch { warmCatalog(force = true) }
     }
 
     /**
@@ -46,18 +73,18 @@ class PackageRegistry(
      */
     fun refreshIfPackagesChanged() {
         scope.launch {
+            if (!_catalogLoaded.value) return@launch
             val current = peekLauncherPackages()
             val cachedPkgs = cache.get().map { it.packageName }.toSet()
             if (current != cachedPkgs) {
-                reload()
+                warmCatalog(force = true)
             }
         }
     }
 
     suspend fun allLaunchables(): List<LaunchableApp> {
-        val hit = cache.get()
-        if (hit.isNotEmpty()) return hit
-        return reload()
+        if (!_catalogLoaded.value) warmCatalog(force = false)
+        return cache.get()
     }
 
     fun resolveLaunchIntent(packageName: String): Intent? {
@@ -76,7 +103,8 @@ class PackageRegistry(
     }
 
     suspend fun visibleApps(prefs: LauncherPrefs): List<LaunchableApp> {
-        val apps = allLaunchables().associateBy { it.packageName }
+        if (!_loaded.value) warmHomeIcons()
+        val apps = cache.get().associateBy { it.packageName }
         return prefs.entries
             .sortedBy { it.order }
             .mapNotNull { apps[it.packageName] }
@@ -122,12 +150,42 @@ class PackageRegistry(
         }
     }
 
-    private suspend fun reload(): List<LaunchableApp> = withContext(Dispatchers.Default) {
-        val loaded = queryLaunchables()
-        cache.set(loaded)
-        _launchables.value = loaded
-        _loaded.value = true
-        loaded
+    private suspend fun warmCatalog(force: Boolean) {
+        if (!force && _catalogLoaded.value) return
+        val loaded = withContext(Dispatchers.Default) { queryLaunchables() }
+        publishMutex.withLock {
+            if (!force && _catalogLoaded.value) return@withLock
+            cache.set(loaded)
+            _launchables.value = loaded
+            _catalogLoaded.value = true
+            _loaded.value = true
+        }
+    }
+
+    private suspend fun publishHome(apps: List<LaunchableApp>) {
+        publishMutex.withLock {
+            if (_catalogLoaded.value) {
+                _loaded.value = true
+                return@withLock
+            }
+            cache.set(apps)
+            _launchables.value = apps
+            _loaded.value = true
+        }
+    }
+
+    private fun loadListed(packageNames: List<String>): List<LaunchableApp> {
+        val seen = LinkedHashSet<String>()
+        val out = ArrayList<LaunchableApp>(packageNames.size)
+        for (packageName in packageNames) {
+            if (!seen.add(packageName)) continue
+            val intent = Intent(Intent.ACTION_MAIN)
+                .addCategory(Intent.CATEGORY_LAUNCHER)
+                .setPackage(packageName)
+            val match = pm.queryIntentActivities(intent, 0).firstOrNull() ?: continue
+            toLaunchable(match)?.let { out.add(it) }
+        }
+        return out
     }
 
     private fun peekLauncherPackages(): Set<String> {
@@ -140,17 +198,19 @@ class PackageRegistry(
     private fun queryLaunchables(): List<LaunchableApp> {
         val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
         val resolved = pm.queryIntentActivities(intent, 0)
-        return resolved.mapNotNull { ri ->
-            val info = ri.activityInfo ?: return@mapNotNull null
-            val packageName = info.packageName ?: return@mapNotNull null
-            if (packageName == appContext.packageName) return@mapNotNull null
-            val label = ri.loadLabel(pm)?.toString().orEmpty().ifBlank { packageName }
-            val icon = runCatching {
-                ri.loadIcon(pm)?.toBitmapCached() ?: pm.getApplicationIcon(packageName).toBitmapCached()
-            }.getOrNull() ?: return@mapNotNull null
-            val component = ComponentName(packageName, info.name)
-            LaunchableApp(packageName, label, icon, component)
-        }.sortedBy { it.label.lowercase() }
+        return resolved.mapNotNull { toLaunchable(it) }.sortedBy { it.label.lowercase() }
+    }
+
+    private fun toLaunchable(ri: ResolveInfo): LaunchableApp? {
+        val info = ri.activityInfo ?: return null
+        val packageName = info.packageName ?: return null
+        if (packageName == appContext.packageName) return null
+        val label = ri.loadLabel(pm)?.toString().orEmpty().ifBlank { packageName }
+        val icon = runCatching {
+            ri.loadIcon(pm)?.toBitmapCached() ?: pm.getApplicationIcon(packageName).toBitmapCached()
+        }.getOrNull() ?: return null
+        val component = ComponentName(packageName, info.name)
+        return LaunchableApp(packageName, label, icon, component)
     }
 
     private fun log(message: String) {
