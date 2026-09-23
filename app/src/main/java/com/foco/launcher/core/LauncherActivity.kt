@@ -76,6 +76,13 @@ class LauncherActivity : ComponentActivity() {
                     onOpenAvisos = {
                         startActivity(SettingsActivity.intent(this, SettingsActivity.DEST_AVISOS))
                     },
+                    onRefreshWork = vm::refreshWork,
+                    onRemovePersonal = vm::removePersonal,
+                    onEnsureWorkIcon = vm::ensureWorkIcon,
+                    onOpenWorkSettings = {
+                        LaunchController.openWorkProfileSettings(this)
+                    },
+                    onQuietTap = vm::showQuietBlocked,
                     onMessageShown = vm::clearMessage,
                 )
             }

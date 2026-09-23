@@ -37,8 +37,13 @@ object SuggestedApps {
         return phone(context, context.packageManager)?.packageName == packageName
     }
 
+    /** Package that resolves [android.provider.Settings.ACTION_SETTINGS], not a hardcoded OEM name. */
+    fun settingsPackage(context: Context): String? {
+        return settings(context, context.packageManager)?.packageName
+    }
+
     fun isSystemSettings(context: Context, packageName: String): Boolean {
-        return settings(context, context.packageManager)?.packageName == packageName
+        return settingsPackage(context) == packageName
     }
 
     private fun phone(context: Context, pm: PackageManager): SuggestedApp? {

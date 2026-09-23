@@ -22,6 +22,11 @@
         <intent>
             <action android:name="android.settings.SETTINGS" />
         </intent>
+        <!-- So resolveActivity can see managed-profile settings on API 30+. Omitted from UI if unresolved. -->
+        <intent>
+            <action android:name="android.settings.MANAGED_PROFILE_SETTINGS" />
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent>
     </queries>
 
     <application

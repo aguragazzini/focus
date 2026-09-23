@@ -47,9 +47,13 @@ import androidx.compose.ui.unit.dp
 import com.foco.launcher.R
 import com.foco.launcher.core.FocoInk
 import com.foco.launcher.core.FocoPaper
+import com.foco.launcher.core.FocoPaperDim
 import com.foco.launcher.core.FocoPrimaryButton
 import com.foco.launcher.core.FocoTextButton
+import com.foco.launcher.core.LaunchpadRules
 import com.foco.launcher.registry.LaunchableApp
+import com.foco.launcher.work.WorkCatalogRules
+import com.foco.launcher.work.WorkSettingsStatus
 
 @Composable
 fun SettingsHost(
@@ -73,6 +77,8 @@ fun SettingsHost(
     onSkipNls: () -> Unit,
     onSetNotifAllowed: (String, Boolean) -> Unit,
     onNlsMessageShown: () -> Unit,
+    onRefreshWork: () -> Unit,
+    onOpenWorkSettings: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -84,6 +90,8 @@ fun SettingsHost(
             onChooseDefault = onChooseDefault,
             onOpenDefaultApps = onOpenDefaultApps,
             onOpenSystemSettings = onOpenSystemSettings,
+            onRefreshWork = onRefreshWork,
+            onOpenWorkSettings = onOpenWorkSettings,
         )
         SettingsDest.Edit -> EditAppsScreen(
             state = state,
@@ -132,6 +140,8 @@ private fun SettingsMain(
     onChooseDefault: () -> Unit,
     onOpenDefaultApps: () -> Unit,
     onOpenSystemSettings: () -> Unit,
+    onRefreshWork: () -> Unit,
+    onOpenWorkSettings: () -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -162,7 +172,11 @@ private fun SettingsMain(
             contentPadding = PaddingValues(bottom = 32.dp),
         ) {
             item {
-                SettingsRow(stringResource(R.string.settings_apps), onClick = onOpenEdit)
+                SettingsRow(
+                    title = stringResource(R.string.settings_apps),
+                    subtitle = stringResource(R.string.settings_apps_count, state.whitelist.size),
+                    onClick = onOpenEdit,
+                )
                 HorizontalDivider()
                 SettingsRow(
                     title = stringResource(R.string.settings_notifications),
@@ -170,7 +184,23 @@ private fun SettingsMain(
                     onClick = onOpenAvisos,
                 )
                 HorizontalDivider()
-                SettingsRow(stringResource(R.string.settings_default), onClick = onChooseDefault)
+                WorkProfileBlock(
+                    state = state,
+                    onRefresh = onRefreshWork,
+                    onOpenWorkSettings = onOpenWorkSettings,
+                )
+                HorizontalDivider()
+                SettingsRow(
+                    title = stringResource(R.string.settings_default),
+                    subtitle = stringResource(
+                        if (state.isDefaultHome) {
+                            R.string.settings_default_foco
+                        } else {
+                            R.string.settings_default_other
+                        },
+                    ),
+                    onClick = onChooseDefault,
+                )
                 HorizontalDivider()
                 SettingsRow(
                     title = stringResource(R.string.settings_previous_launcher),
@@ -195,6 +225,69 @@ private fun SettingsMain(
                         text = stringResource(R.string.settings_about_body),
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun WorkProfileBlock(
+    state: SettingsUiState,
+    onRefresh: () -> Unit,
+    onOpenWorkSettings: () -> Unit,
+) {
+    val status = WorkCatalogRules.settingsStatus(
+        loaded = state.workLoaded,
+        hasProfile = state.workProfile,
+        quietEnabled = state.workQuiet,
+        loadFailed = state.workFailed,
+        activityCount = state.workCount,
+    )
+    val subtitle = when (status) {
+        WorkSettingsStatus.Unknown -> stringResource(R.string.strip_work_unknown)
+        WorkSettingsStatus.Absent -> stringResource(R.string.settings_work_off)
+        WorkSettingsStatus.Visible -> stringResource(R.string.settings_work_on)
+        WorkSettingsStatus.Quiet -> stringResource(R.string.settings_work_quiet)
+        WorkSettingsStatus.Failed -> stringResource(R.string.work_load_error)
+    }
+    val body = when (status) {
+        WorkSettingsStatus.Absent -> stringResource(R.string.settings_work_none)
+        WorkSettingsStatus.Visible, WorkSettingsStatus.Quiet -> stringResource(R.string.settings_work_body)
+        WorkSettingsStatus.Unknown, WorkSettingsStatus.Failed -> null
+    }
+    val showLink = LaunchpadRules.showWorkSettingsLink(state.workLink, state.workProfile)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 18.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.settings_work),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+        if (body != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(text = body, style = MaterialTheme.typography.bodyMedium, color = FocoPaperDim)
+        }
+        if (state.workNote != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = state.workNote,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            FocoTextButton(onClick = onRefresh, enabled = !state.workRefreshing) {
+                Text(stringResource(R.string.settings_work_refresh))
+            }
+            if (showLink) {
+                FocoTextButton(onClick = onOpenWorkSettings) {
+                    Text(stringResource(R.string.settings_work_open))
                 }
             }
         }
@@ -451,17 +544,17 @@ private fun RemoveDialog(
     onDismiss: () -> Unit,
 ) {
     val body = when {
-        isSettings -> stringResource(R.string.remove_settings_warn)
+        isSettings -> stringResource(R.string.confirm_remove_settings)
         isLast -> stringResource(R.string.remove_last_warn)
         else -> null
     }
     val confirmLabel = if (isSettings) {
-        stringResource(R.string.remove_settings_confirm)
+        stringResource(R.string.confirm_remove_anyway)
     } else {
         stringResource(R.string.remove_confirm)
     }
     val dismissLabel = if (isSettings) {
-        stringResource(R.string.remove_settings_keep)
+        stringResource(R.string.confirm_leave)
     } else {
         stringResource(R.string.remove_cancel)
     }
