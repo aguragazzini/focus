@@ -5,6 +5,7 @@ import com.foco.launcher.notification.NotificationAllowlistStore
 import com.foco.launcher.notification.NotificationPolicyEngine
 import com.foco.launcher.registry.PackageRegistry
 import com.foco.launcher.registry.PrefsStore
+import com.foco.launcher.work.WorkCatalog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,8 @@ class FocoApp : Application() {
         private set
     lateinit var registry: PackageRegistry
         private set
+    lateinit var workCatalog: WorkCatalog
+        private set
     lateinit var notificationPolicy: NotificationPolicyEngine
         private set
 
@@ -32,6 +35,7 @@ class FocoApp : Application() {
         super.onCreate()
         prefsStore = PrefsStore(this)
         registry = PackageRegistry(this, prefsStore)
+        workCatalog = WorkCatalog(this)
         notificationPolicy = NotificationPolicyEngine(this, prefsStore)
         applicationScope.launch {
             try {
