@@ -4,8 +4,13 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foco.launcher.FocoApp
@@ -24,16 +29,23 @@ class LauncherActivity : ComponentActivity() {
             FocoTheme {
                 val state by vm.state.collectAsStateWithLifecycle()
 
-                LaunchedEffect(state.setupDone, state.ready) {
-                    if (state.ready && !state.setupDone) {
+                if (!state.prefsReady) {
+                    HomeLoading()
+                } else if (!state.setupDone) {
+                    LaunchedEffect(Unit) {
                         startActivity(SetupActivity.intent(this@LauncherActivity))
                         if (!LaunchController.isDefaultHome(this@LauncherActivity)) {
                             finish()
                         }
                     }
-                }
-
-                HomeScreen(
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                    )
+                } else if (!state.iconsReady) {
+                    HomeLoading()
+                } else HomeScreen(
                     state = state,
                     onLaunch = { pkg ->
                         if (!LaunchController.openApp(this, app.registry, pkg)) {

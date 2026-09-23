@@ -4,7 +4,7 @@ object WhitelistMutations {
     fun add(
         entries: List<WhitelistEntry>,
         packageName: String,
-        bioEnabled: Boolean = true,
+        bioEnabled: Boolean = false,
         allowNotif: Boolean = true,
     ): List<WhitelistEntry> {
         if (entries.any { it.packageName == packageName }) return entries

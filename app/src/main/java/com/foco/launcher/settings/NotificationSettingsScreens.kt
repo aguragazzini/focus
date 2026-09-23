@@ -9,14 +9,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,9 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -44,6 +43,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.foco.launcher.R
+import com.foco.launcher.core.FocoPrimaryButton
+import com.foco.launcher.core.FocoSwitch
+import com.foco.launcher.core.FocoTextButton
 
 @Composable
 fun NlsOnboardingScreen(
@@ -53,9 +55,11 @@ fun NlsOnboardingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.Start,
     ) {
         Text(
             text = stringResource(R.string.nls_title),
@@ -67,26 +71,26 @@ fun NlsOnboardingScreen(
             text = stringResource(R.string.nls_body),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            textAlign = TextAlign.Start,
         )
         Spacer(Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.nls_how),
             style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
+            textAlign = TextAlign.Start,
         )
         Spacer(Modifier.height(32.dp))
-        Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
+        FocoPrimaryButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.nls_cta))
         }
         Spacer(Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.nls_moto_hint),
             style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Center,
+            textAlign = TextAlign.Start,
         )
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onSkip) {
+        FocoTextButton(onClick = onSkip) {
             Text(stringResource(R.string.nls_skip))
         }
     }
@@ -151,7 +155,7 @@ fun AvisosScreen(
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                    Switch(
+                    FocoSwitch(
                         checked = state.nlsFilterEnabled,
                         onCheckedChange = onToggleFilter,
                     )
@@ -192,7 +196,7 @@ fun AvisosScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                     )
-                    Button(
+                    FocoPrimaryButton(
                         onClick = onOpenNlsSettings,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -249,7 +253,7 @@ fun AvisosScreen(
                                 color = MaterialTheme.colorScheme.onBackground,
                             )
                         }
-                        Switch(
+                        FocoSwitch(
                             checked = row.allowed,
                             onCheckedChange = { onSetNotifAllowed(row.app.packageName, it) },
                         )

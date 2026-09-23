@@ -23,17 +23,16 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -46,6 +45,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.foco.launcher.R
+import com.foco.launcher.core.FocoInk
+import com.foco.launcher.core.FocoPaper
+import com.foco.launcher.core.FocoPrimaryButton
+import com.foco.launcher.core.FocoTextButton
 import com.foco.launcher.registry.LaunchableApp
 
 @Composable
@@ -56,6 +59,7 @@ fun SettingsHost(
     onOpenAdd: () -> Unit,
     onOpenAvisos: () -> Unit,
     onChooseDefault: () -> Unit,
+    onOpenDefaultApps: () -> Unit,
     onOpenSystemSettings: () -> Unit,
     onToggleAdd: (String) -> Unit,
     onConfirmAdd: () -> Unit,
@@ -78,6 +82,7 @@ fun SettingsHost(
             onOpenEdit = onOpenEdit,
             onOpenAvisos = onOpenAvisos,
             onChooseDefault = onChooseDefault,
+            onOpenDefaultApps = onOpenDefaultApps,
             onOpenSystemSettings = onOpenSystemSettings,
         )
         SettingsDest.Edit -> EditAppsScreen(
@@ -125,13 +130,19 @@ private fun SettingsMain(
     onOpenEdit: () -> Unit,
     onOpenAvisos: () -> Unit,
     onChooseDefault: () -> Unit,
+    onOpenDefaultApps: () -> Unit,
     onOpenSystemSettings: () -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.settings_title)) },
+                title = {
+                    Text(
+                        text = stringResource(R.string.settings_title),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = null)
@@ -161,7 +172,11 @@ private fun SettingsMain(
                 HorizontalDivider()
                 SettingsRow(stringResource(R.string.settings_default), onClick = onChooseDefault)
                 HorizontalDivider()
-                SettingsRow(stringResource(R.string.settings_previous_launcher), onClick = onChooseDefault)
+                SettingsRow(
+                    title = stringResource(R.string.settings_previous_launcher),
+                    subtitle = stringResource(R.string.settings_previous_sub),
+                    onClick = onOpenDefaultApps,
+                )
                 HorizontalDivider()
                 SettingsRow(stringResource(R.string.settings_system), onClick = onOpenSystemSettings)
                 HorizontalDivider()
@@ -176,11 +191,6 @@ private fun SettingsMain(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = stringResource(R.string.settings_week1_note),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Spacer(Modifier.height(8.dp))
                     Text(
                         text = stringResource(R.string.settings_about_body),
                         style = MaterialTheme.typography.bodyMedium,
@@ -238,7 +248,11 @@ private fun EditAppsScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onOpenAdd) {
+            FloatingActionButton(
+                onClick = onOpenAdd,
+                containerColor = FocoPaper,
+                contentColor = FocoInk,
+            ) {
                 Icon(Icons.Outlined.Add, contentDescription = stringResource(R.string.edit_add))
             }
         },
@@ -314,11 +328,23 @@ private fun EditRow(
                 .weight(1f)
                 .padding(horizontal = 12.dp),
         )
-        IconButton(onClick = onMoveUp, enabled = canUp) {
-            Icon(Icons.Outlined.KeyboardArrowUp, contentDescription = stringResource(R.string.edit_move_up))
+        val moveColors = IconButtonDefaults.iconButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+        )
+        IconButton(onClick = onMoveUp, enabled = canUp, colors = moveColors) {
+            Icon(
+                imageVector = Icons.Outlined.KeyboardArrowUp,
+                contentDescription = stringResource(R.string.edit_move_up),
+                modifier = Modifier.size(20.dp),
+            )
         }
-        IconButton(onClick = onMoveDown, enabled = canDown) {
-            Icon(Icons.Outlined.KeyboardArrowDown, contentDescription = stringResource(R.string.edit_move_down))
+        IconButton(onClick = onMoveDown, enabled = canDown, colors = moveColors) {
+            Icon(
+                imageVector = Icons.Outlined.KeyboardArrowDown,
+                contentDescription = stringResource(R.string.edit_move_down),
+                modifier = Modifier.size(20.dp),
+            )
         }
         IconButton(onClick = onRemove) {
             Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.edit_remove))
@@ -351,7 +377,7 @@ private fun AddAppsScreen(
             )
         },
         bottomBar = {
-            Button(
+            FocoPrimaryButton(
                 onClick = onConfirmAdd,
                 enabled = state.pendingAdd.isNotEmpty(),
                 modifier = Modifier
@@ -441,14 +467,20 @@ private fun RemoveDialog(
     }
     AlertDialog(
         onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        textContentColor = MaterialTheme.colorScheme.onSurface,
         text = {
-            Text(body ?: stringResource(R.string.edit_remove))
+            Text(
+                text = body ?: stringResource(R.string.edit_remove),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
         },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text(confirmLabel) }
+            FocoTextButton(onClick = onConfirm) { Text(confirmLabel) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text(dismissLabel) }
+            FocoTextButton(onClick = onDismiss) { Text(dismissLabel) }
         },
     )
 }

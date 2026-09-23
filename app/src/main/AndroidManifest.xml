@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
     <!-- Android 11+: see apps that declare a launcher intent. Prefer this over QUERY_ALL_PACKAGES. -->
     <queries>
         <intent>
@@ -33,7 +35,7 @@
 
         <activity
             android:name=".core.LauncherActivity"
-            android:clearTaskOnLaunch="true"
+            android:clearTaskOnLaunch="false"
             android:excludeFromRecents="true"
             android:exported="true"
             android:launchMode="singleTask"
@@ -68,6 +70,15 @@
                     android:scheme="foco" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".core.BootCompletedReceiver"
+            android:exported="true"
+            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
 
         <receiver
             android:name=".registry.PackageChangeReceiver"

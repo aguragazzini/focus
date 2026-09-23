@@ -17,6 +17,8 @@ class LauncherPrefsTest {
         assertEquals(setOf("home.on"), prefs.notificationAllowlist)
         assertFalse("com.instagram.android" in prefs.notificationAllowlist)
         assertTrue(WhitelistEntry("new.pkg", 0).allowNotif)
+        assertFalse(WhitelistEntry("new.pkg", 0).bioEnabled)
+        assertFalse(LauncherPrefs().biometricGlobalEnabled)
     }
 
     @Test
