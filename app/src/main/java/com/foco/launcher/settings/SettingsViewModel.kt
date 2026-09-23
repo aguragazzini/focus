@@ -237,6 +237,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val byPkg = core.all.associateBy { it.packageName }
         val whitelist = core.prefs.entries.sortedBy { it.order }.mapNotNull { byPkg[it.packageName] }
         val selected = core.prefs.entries.map { it.packageName }.toSet()
+        // Personal launcher activities only. Work-profile activities stay in WorkCatalog.
         val catalog = core.all.filterNot { it.packageName in selected }
         val settingsPkg = core.all.find {
             SuggestedApps.isSystemSettings(getApplication(), it.packageName)
