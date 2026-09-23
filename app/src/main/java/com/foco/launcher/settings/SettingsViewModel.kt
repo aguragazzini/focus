@@ -201,6 +201,10 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         nlsMessage.value = null
     }
 
+    fun showNlsOpenFailed() {
+        nlsMessage.value = getApplication<Application>().getString(com.foco.launcher.R.string.nls_open_fail)
+    }
+
     fun setNotifAllowed(packageName: String, allowed: Boolean) {
         viewModelScope.launch {
             app.prefsStore.setAllowNotif(packageName, allowed)

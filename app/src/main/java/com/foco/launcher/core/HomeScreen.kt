@@ -28,8 +28,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MoreVert
-import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Work
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -111,6 +109,8 @@ fun HomeScreen(
     onAddApps: () -> Unit,
     onChooseDefault: () -> Unit,
     onOpenAvisos: () -> Unit,
+    onOpenClock: () -> Unit,
+    onOpenCalendar: () -> Unit,
     onRefreshWork: () -> Unit,
     onRemovePersonal: (String) -> Unit,
     onEnsureWorkIcon: (String) -> Unit,
@@ -163,32 +163,43 @@ fun HomeScreen(
                 onOpenSystemSettings = onOpenSystemSettings,
                 onRefreshWork = onRefreshWork,
             )
-            StatusStrip(state = state, onOpenFocoSettings = onOpenFocoSettings)
-            when (state.banner) {
-                HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
-                HomeBanner.Nls -> NlsOffBanner(onOpenAvisos)
-                HomeBanner.None -> Unit
-            }
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 24.dp,
-                    vertical = 16.dp,
-                ),
             ) {
+                item(key = "clock") {
+                    Spacer(Modifier.height(12.dp))
+                    HomeClock(
+                        onOpenClock = onOpenClock,
+                        onOpenCalendar = onOpenCalendar,
+                        modifier = Modifier.padding(horizontal = 24.dp),
+                    )
+                    Spacer(Modifier.height(32.dp))
+                }
+                item(key = "banner") {
+                    when (state.banner) {
+                        HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
+                        HomeBanner.Nls -> NlsOffBanner(onOpenAvisos)
+                        HomeBanner.None -> Unit
+                    }
+                    if (state.banner != HomeBanner.None) {
+                        Spacer(Modifier.height(16.dp))
+                    }
+                }
                 item(key = "personal-header") {
-                    PersonalHeader(
-                        hasApps = state.apps.isNotEmpty(),
-                        onEdit = onEditApps,
-                        onAdd = onAddApps,
+                    SectionTitle(
+                        text = stringResource(R.string.section_personal),
+                        modifier = Modifier.padding(horizontal = 24.dp),
                     )
                     Spacer(Modifier.height(12.dp))
                 }
                 if (state.apps.isEmpty()) {
                     item(key = "personal-empty") {
-                        PersonalEmptyInline(onOpenSystemSettings = onOpenSystemSettings)
+                        PersonalEmptyInline(
+                            onAddApps = onAddApps,
+                            onOpenSystemSettings = onOpenSystemSettings,
+                        )
                     }
                 } else {
                     val rows = state.apps.map { it.toCell() }.chunked(4)
@@ -199,6 +210,7 @@ fun HomeScreen(
                         AppRow(
                             cells = row,
                             iconEpoch = 0L,
+                            modifier = Modifier.padding(horizontal = 24.dp),
                             onClick = { cell -> onLaunch(cell.id) },
                             onLongClick = { cell ->
                                 state.apps.firstOrNull { it.packageName == cell.id }?.let { sheetApp = it }
@@ -209,35 +221,36 @@ fun HomeScreen(
                 }
                 if (state.workKind != WorkSectionKind.Hidden) {
                     item(key = "work-divider") {
+                        Spacer(Modifier.height(8.dp))
                         HorizontalDivider(
-                            modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
+                            modifier = Modifier.padding(horizontal = 24.dp),
                             thickness = 1.dp,
                             color = FocoLine,
                         )
+                        Spacer(Modifier.height(20.dp))
                     }
                     item(key = "work-header") {
                         WorkHeader(
                             kind = state.workKind,
-                            count = WorkCatalogRules.headerCount(state.workApps.size),
-                            refreshing = state.workRefreshing,
                             query = if (searchOpen) workQuery else "",
                             showSearch = searchOpen,
                             showQuietLink = state.workLink,
                             onQuery = { workQuery = it },
-                            onRefresh = onRefreshWork,
                             onOpenWorkSettings = onOpenWorkSettings,
                         )
                     }
                     when {
                         WorkCatalogRules.showErrorCopy(state.workKind) -> {
                             item(key = "work-error") {
-                                Text(
-                                    text = stringResource(R.string.work_load_error),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                FocoTextButton(onClick = onRefreshWork) {
-                                    Text(stringResource(R.string.work_retry))
+                                Column(Modifier.padding(horizontal = 24.dp)) {
+                                    Text(
+                                        text = stringResource(R.string.work_load_error),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    FocoTextButton(onClick = onRefreshWork) {
+                                        Text(stringResource(R.string.work_retry))
+                                    }
                                 }
                             }
                         }
@@ -247,6 +260,7 @@ fun HomeScreen(
                                     text = stringResource(R.string.work_empty),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 24.dp),
                                 )
                             }
                         }
@@ -256,6 +270,7 @@ fun HomeScreen(
                                     text = stringResource(R.string.work_search_empty),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 24.dp),
                                 )
                             }
                         }
@@ -272,6 +287,7 @@ fun HomeScreen(
                                 AppRow(
                                     cells = row,
                                     iconEpoch = state.workIconEpoch,
+                                    modifier = Modifier.padding(horizontal = 24.dp),
                                     onClick = { cell ->
                                         if (muted) {
                                             onQuietTap()
@@ -424,54 +440,6 @@ private fun OverflowItem(label: Int, onClick: () -> Unit) {
 }
 
 @Composable
-private fun StatusStrip(state: HomeUiState, onOpenFocoSettings: () -> Unit) {
-    val filterWord = stringResource(
-        if (state.filterActive) R.string.strip_filter_on else R.string.strip_filter_off,
-    )
-    val workWord = stringResource(
-        when (state.workPresence) {
-            WorkPresence.Unknown -> R.string.strip_work_unknown
-            WorkPresence.Yes -> R.string.strip_work_yes
-            WorkPresence.No -> R.string.strip_work_no
-            WorkPresence.Paused -> R.string.strip_work_pause
-        },
-    )
-    val parts = buildList {
-        add(stringResource(R.string.strip_personal, state.apps.size))
-        add(stringResource(R.string.strip_filter, filterWord))
-        add(stringResource(R.string.strip_work, workWord))
-        if (LaunchpadRules.showBioCell(state.showBio)) {
-            val bio = if (state.bioOnCount > 0) {
-                stringResource(R.string.strip_bio_on, state.bioOnCount)
-            } else {
-                stringResource(R.string.strip_bio_off)
-            }
-            add(stringResource(R.string.strip_bio, bio))
-        }
-    }
-    val line = LaunchpadRules.joinStatus(parts)
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .padding(top = 2.dp, bottom = 8.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(FocoInkElevated)
-            .clickable(onClick = onOpenFocoSettings)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = line,
-            style = MaterialTheme.typography.bodyMedium,
-            color = FocoPaperDim,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
 private fun NotDefaultBanner(onChooseDefault: () -> Unit) {
     BannerRow(
         message = stringResource(R.string.banner_not_default),
@@ -515,149 +483,79 @@ private fun BannerRow(message: String, action: String, onAction: () -> Unit) {
 }
 
 @Composable
-private fun PersonalHeader(hasApps: Boolean, onEdit: () -> Unit, onAdd: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        SectionTitle(
-            text = stringResource(R.string.section_personal),
-            modifier = Modifier.weight(1f),
-        )
-        HeaderAction(
-            text = stringResource(if (hasApps) R.string.personal_edit else R.string.home_add),
-            onClick = if (hasApps) onEdit else onAdd,
-        )
-    }
-}
-
-@Composable
 private fun WorkHeader(
     kind: WorkSectionKind,
-    count: Int,
-    refreshing: Boolean,
     query: String,
     showSearch: Boolean,
     showQuietLink: Boolean,
     onQuery: (String) -> Unit,
-    onRefresh: () -> Unit,
     onOpenWorkSettings: () -> Unit,
 ) {
     val focus = LocalFocusManager.current
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            text = stringResource(R.string.section_work),
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 0.04.em,
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Icon(
-            imageVector = Icons.Outlined.Work,
-            contentDescription = stringResource(R.string.cd_work_badge),
-            modifier = Modifier
-                .padding(start = 6.dp)
-                .size(18.dp),
-            tint = FocoPaperDim,
-        )
-        if (WorkCatalogRules.showWorkCount(kind)) {
+    Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+        SectionTitle(text = stringResource(R.string.section_work))
+        if (WorkCatalogRules.showQuietCopy(kind)) {
+            Spacer(Modifier.height(8.dp))
             Text(
-                text = stringResource(R.string.work_count, count),
+                text = stringResource(R.string.work_quiet_title),
                 style = MaterialTheme.typography.bodyMedium,
-                color = FocoPaperDim,
-                modifier = Modifier.padding(start = 6.dp),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (showQuietLink) {
+                FocoTextButton(onClick = onOpenWorkSettings) {
+                    Text(stringResource(R.string.work_quiet_cta))
+                }
+            }
+        }
+        if (showSearch) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQuery,
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = FocoPaper),
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.work_search),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = FocoPaper,
+                    unfocusedTextColor = FocoPaper,
+                    focusedBorderColor = FocoPaperDim,
+                    unfocusedBorderColor = FocoLine,
+                    cursorColor = FocoPaper,
+                    focusedPlaceholderColor = FocoPaperDim,
+                    unfocusedPlaceholderColor = FocoPaperDim,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                ),
             )
         }
-        Spacer(Modifier.weight(1f))
-        IconButton(onClick = onRefresh, enabled = !refreshing) {
-            if (refreshing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(18.dp),
-                    strokeWidth = 2.dp,
-                    color = FocoPaperDim,
-                )
-            } else {
-                Icon(
-                    imageVector = Icons.Outlined.Refresh,
-                    contentDescription = stringResource(R.string.work_refresh),
-                    modifier = Modifier.size(20.dp),
-                    tint = FocoPaperDim,
-                )
-            }
-        }
+        Spacer(Modifier.height(12.dp))
     }
-    Spacer(Modifier.height(4.dp))
-    Text(
-        text = stringResource(R.string.work_sub),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    if (WorkCatalogRules.showQuietCopy(kind)) {
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.work_quiet_title),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        if (showQuietLink) {
-            FocoTextButton(onClick = onOpenWorkSettings) {
-                Text(stringResource(R.string.work_quiet_cta))
-            }
-        }
-    }
-    if (showSearch) {
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQuery,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = FocoPaper),
-            placeholder = {
-                Text(
-                    text = stringResource(R.string.work_search),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
-            shape = RoundedCornerShape(12.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = FocoPaper,
-                unfocusedTextColor = FocoPaper,
-                focusedBorderColor = FocoPaperDim,
-                unfocusedBorderColor = FocoLine,
-                cursorColor = FocoPaper,
-                focusedPlaceholderColor = FocoPaperDim,
-                unfocusedPlaceholderColor = FocoPaperDim,
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-            ),
-        )
-    }
-    Spacer(Modifier.height(12.dp))
 }
 
 @Composable
-private fun PersonalEmptyInline(onOpenSystemSettings: () -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().longPressEmpty(onOpenSystemSettings)) {
+private fun PersonalEmptyInline(onAddApps: () -> Unit, onOpenSystemSettings: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .longPressEmpty(onOpenSystemSettings),
+    ) {
         Text(
             text = stringResource(R.string.home_empty),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        Spacer(Modifier.height(4.dp))
-        Text(
-            text = stringResource(R.string.home_empty_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        FocoTextButton(onClick = onOpenSystemSettings) {
-            Text(stringResource(R.string.home_system_settings))
+        FocoTextButton(onClick = onAddApps) {
+            Text(stringResource(R.string.home_add))
         }
     }
 }
@@ -672,19 +570,6 @@ private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
             letterSpacing = 0.04.em,
         ),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
-private fun HeaderAction(text: String, onClick: () -> Unit) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
-        color = FocoPaperDim,
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
     )
 }
 
@@ -719,9 +604,10 @@ private fun AppRow(
     onClick: (HomeCell) -> Unit,
     onLongClick: ((HomeCell) -> Unit)?,
     onEnsureIcon: ((HomeCell) -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         cells.forEach { cell ->

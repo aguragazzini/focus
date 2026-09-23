@@ -125,7 +125,10 @@
     <string name="nls_done">Listo.</string>
     <string name="nls_toggle">Silenciar otras notificaciones</string>
     <string name="nls_master_sub">En el perfil personal, solo avisan las apps que marques abajo.</string>
-    <string name="nls_moto_hint">En Motorola: Ajustes → Notificaciones → acceso / apps con acceso.</string>
+    <string name="nls_moto_hint">En Motorola, si Foco no aparece: Ajustes → Apps → Foco → menú → Permitir ajustes restringidos. Después, Notificaciones → acceso a notificaciones.</string>
+    <string name="nls_open_fail">No se abrió el acceso a notificaciones.</string>
+    <string name="clock_time_cd">Hora %1$s</string>
+    <string name="clock_date_cd">Fecha %1$s</string>
     <string name="nls_missing_permission">Falta el permiso del sistema.</string>
     <string name="nls_section">Apps que pueden avisar</string>
     <string name="nls_footer">Las apps que no están en Foco no avisan.</string>

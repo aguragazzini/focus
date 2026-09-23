@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foco.launcher.FocoApp
+import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.settings.SettingsActivity
 import com.foco.launcher.settings.SetupActivity
 import com.foco.launcher.work.WorkApp
@@ -49,9 +50,13 @@ class LauncherActivity : ComponentActivity() {
                 } else HomeScreen(
                     state = state,
                     onLaunch = { pkg ->
-                        if (!LaunchController.openApp(this, app.registry, pkg)) {
-                            vm.showOpenFail()
+                        val settingsPkg = SuggestedApps.settingsPackage(this)
+                        val opened = if (LaunchpadRules.needsSettingsConfirm(pkg, settingsPkg)) {
+                            LaunchController.openSystemSettings(this)
+                        } else {
+                            LaunchController.openApp(this, app.registry, pkg)
                         }
+                        if (!opened) vm.showOpenFail()
                     },
                     onLaunchWork = { workApp: WorkApp ->
                         if (!LaunchController.openWorkApp(this, workApp)) {
@@ -62,8 +67,10 @@ class LauncherActivity : ComponentActivity() {
                         startActivity(SettingsActivity.intent(this))
                     },
                     onOpenSystemSettings = {
-                        LaunchController.openSystemSettings(this)
+                        if (!LaunchController.openSystemSettings(this)) vm.showOpenFail()
                     },
+                    onOpenClock = { LaunchController.openClock(this) },
+                    onOpenCalendar = { LaunchController.openCalendar(this) },
                     onEditApps = {
                         startActivity(SettingsActivity.intent(this, SettingsActivity.DEST_EDIT))
                     },

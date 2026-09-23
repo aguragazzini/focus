@@ -9,10 +9,14 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import com.foco.launcher.FocoApp
 import com.foco.launcher.core.FocoTheme
 import com.foco.launcher.core.LaunchController
 import com.foco.launcher.notification.NlsStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsActivity : ComponentActivity() {
     private val vm: SettingsViewModel by viewModels { SettingsViewModel.factory(application as FocoApp) }
@@ -43,7 +47,9 @@ class SettingsActivity : ComponentActivity() {
                     onMoveUp = { vm.move(it, -1) },
                     onMoveDown = { vm.move(it, 1) },
                     onToggleFilter = vm::requestEnableFilter,
-                    onOpenNlsSettings = { NlsStatus.openListenerSettings(this) },
+                    onOpenNlsSettings = {
+                        if (!NlsStatus.openListenerSettings(this)) vm.showNlsOpenFailed()
+                    },
                     onSkipNls = vm::skipNlsOnboarding,
                     onSetNotifAllowed = vm::setNotifAllowed,
                     onNlsMessageShown = vm::clearNlsMessage,
@@ -64,7 +70,11 @@ class SettingsActivity : ComponentActivity() {
         super.onResume()
         vm.refreshDefault(LaunchController.isDefaultHome(this))
         vm.refreshNls()
-        vm.setWorkLinkResolved(LaunchController.workProfileSettingsResolves(this))
+        NlsStatus.requestRebind(this)
+        lifecycleScope.launch(Dispatchers.Default) {
+            val resolved = LaunchController.workProfileSettingsResolves(this@SettingsActivity)
+            withContext(Dispatchers.Main) { vm.setWorkLinkResolved(resolved) }
+        }
         (application as FocoApp).registry.refreshIfPackagesChanged()
         (application as FocoApp).registry.invalidate()
         (application as FocoApp).workCatalog.refresh()
@@ -79,7 +89,10 @@ class SettingsActivity : ComponentActivity() {
         const val DEST_NLS_ONBOARDING = "nls"
 
         fun intent(context: Context, dest: String = DEST_MAIN): Intent {
-            return Intent(context, SettingsActivity::class.java).putExtra(EXTRA_DEST, dest)
+            // Own task so a HOME redelivery cannot clear Foco settings off the launcher stack.
+            return Intent(context, SettingsActivity::class.java)
+                .putExtra(EXTRA_DEST, dest)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
 
         fun intentDest(intent: Intent?): String {

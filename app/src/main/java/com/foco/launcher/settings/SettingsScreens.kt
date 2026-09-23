@@ -273,6 +273,14 @@ private fun WorkProfileBlock(
             Spacer(Modifier.height(8.dp))
             Text(text = body, style = MaterialTheme.typography.bodyMedium, color = FocoPaperDim)
         }
+        if (status == WorkSettingsStatus.Visible || status == WorkSettingsStatus.Quiet) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.work_sub),
+                style = MaterialTheme.typography.bodyMedium,
+                color = FocoPaperDim,
+            )
+        }
         if (state.workNote != null) {
             Spacer(Modifier.height(8.dp))
             Text(

@@ -23,12 +23,17 @@ class NotificationPolicyEngine(
     init {
         prefsStore.prefs
             .onEach { prefs ->
-                snapshot.set(
-                    Snapshot(
-                        nlsFilterEnabled = prefs.nlsFilterEnabled,
-                        packages = prefs.notificationAllowlist,
-                    ),
+                val next = Snapshot(
+                    nlsFilterEnabled = prefs.nlsFilterEnabled,
+                    packages = prefs.notificationAllowlist,
                 )
+                val prev = snapshot.getAndSet(next)
+                if (next.nlsFilterEnabled && !prev.nlsFilterEnabled && NlsStatus.isGranted(appContext)) {
+                    NlsStatus.requestRebind(appContext)
+                }
+                if (next.nlsFilterEnabled) {
+                    FocoNotificationListener.scrubIfConnected()
+                }
             }
             .launchIn(scope)
     }

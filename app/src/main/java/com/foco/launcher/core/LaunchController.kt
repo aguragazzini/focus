@@ -6,6 +6,7 @@ import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.provider.Settings
 import com.foco.launcher.registry.PackageRegistry
+import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkApp
 import com.foco.launcher.work.WorkSettingsLink
@@ -35,9 +36,18 @@ object LaunchController {
     }
 
     fun openSystemSettings(context: Context): Boolean {
-        val intent = Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return startSafely(context, intent)
+        val intent = Intent(Settings.ACTION_SETTINGS).addCategory(Intent.CATEGORY_DEFAULT)
+        if (ResolvedStart.start(context, intent)) return true
+        val pkg = SuggestedApps.settingsPackage(context) ?: return false
+        val launch = context.packageManager.getLaunchIntentForPackage(pkg) ?: return false
+        return ResolvedStart.start(context, launch)
     }
+
+    /** Clock app if one resolves. No-op when the device has none. No weather. */
+    fun openClock(context: Context): Boolean = openLink(context, SystemAppLinks.clockCandidates())
+
+    /** Calendar app if one resolves. No-op when the device has none. */
+    fun openCalendar(context: Context): Boolean = openLink(context, SystemAppLinks.calendarCandidates())
 
     fun workProfileSettingsResolves(context: Context): Boolean {
         return WorkSettingsLink.shouldOffer(resolveWorkSettings(context))
@@ -49,15 +59,12 @@ object LaunchController {
      */
     fun openWorkProfileSettings(context: Context): Boolean {
         if (!resolveWorkSettings(context)) return false
-        return startSafely(context, WorkSettingsLink.intent())
+        return ResolvedStart.start(context, WorkSettingsLink.intent())
     }
 
     fun openHomePicker(context: Context): Boolean {
-        val home = Intent(Settings.ACTION_HOME_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (startSafely(context, home)) return true
-        val defaults = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return startSafely(context, defaults)
+        if (ResolvedStart.start(context, Intent(Settings.ACTION_HOME_SETTINGS))) return true
+        return ResolvedStart.start(context, Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
     }
 
     /**
@@ -65,9 +72,7 @@ object LaunchController {
      * This is not the same entry as [openHomePicker].
      */
     fun openDefaultAppsSettings(context: Context): Boolean {
-        val defaults = Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        if (startSafely(context, defaults)) return true
+        if (ResolvedStart.start(context, Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))) return true
         return openHomePicker(context)
     }
 
@@ -78,11 +83,30 @@ object LaunchController {
     }
 
     private fun resolveWorkSettings(context: Context): Boolean {
-        val resolved = context.packageManager.resolveActivity(
-            WorkSettingsLink.intent(),
-            PackageManager.MATCH_DEFAULT_ONLY,
-        )
-        return resolved != null
+        return runCatching {
+            context.packageManager.resolveActivity(
+                WorkSettingsLink.intent(),
+                PackageManager.MATCH_DEFAULT_ONLY,
+            ) != null
+        }.getOrDefault(false)
+    }
+
+    private fun openLink(context: Context, candidates: List<SystemAppLinks.Candidate>): Boolean {
+        for (candidate in candidates) {
+            val intent = linkIntent(context, candidate) ?: continue
+            if (ResolvedStart.start(context, intent)) return true
+        }
+        return false
+    }
+
+    private fun linkIntent(context: Context, candidate: SystemAppLinks.Candidate): Intent? {
+        val pkg = candidate.launcherPackage
+        if (pkg != null) {
+            return context.packageManager.getLaunchIntentForPackage(pkg)
+        }
+        return Intent(candidate.action).apply {
+            candidate.categories.forEach { addCategory(it) }
+        }
     }
 
     private fun startSafely(context: Context, intent: Intent): Boolean {
