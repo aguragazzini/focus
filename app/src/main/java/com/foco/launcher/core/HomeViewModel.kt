@@ -6,11 +6,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.foco.launcher.FocoApp
+import com.foco.launcher.R
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
+import com.foco.launcher.registry.WhitelistMutations
+import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkApp
 import com.foco.launcher.work.WorkCatalogRules
+import com.foco.launcher.work.WorkHomeState
+import com.foco.launcher.work.WorkSectionKind
+import com.foco.launcher.work.snapshot
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -25,19 +32,29 @@ data class HomeUiState(
     val apps: List<LaunchableApp> = emptyList(),
     val message: String? = null,
     val banner: HomeBanner = HomeBanner.None,
-    val workProfile: Boolean = false,
+    val filterActive: Boolean = false,
+    val workPresence: WorkPresence = WorkPresence.Unknown,
+    val workKind: WorkSectionKind = WorkSectionKind.Hidden,
     val workApps: List<WorkApp> = emptyList(),
+    val workIcons: Map<String, android.graphics.Bitmap> = emptyMap(),
+    val workIconEpoch: Long = 0L,
+    val workRefreshing: Boolean = false,
+    val workLink: Boolean = false,
+    val showBio: Boolean = false,
+    val bioOnCount: Int = 0,
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as FocoApp
     private val message = MutableStateFlow<String?>(null)
     private val resumeTick = MutableStateFlow(0)
+    private val workLinkResolved = MutableStateFlow(false)
 
     private val _state = MutableStateFlow(HomeUiState())
     val state: StateFlow<HomeUiState> = _state.asStateFlow()
 
     init {
+        refreshDeviceFacts()
         viewModelScope.launch {
             combine(
                 app.startupReady,
@@ -49,49 +66,120 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }.combine(message) { snap, msg ->
                 snap to msg
             }.combine(resumeTick) { pair, _ ->
+                pair
+            }.combine(workLinkResolved) { pair, link ->
+                pair to link
+            }.combine(app.workCatalog.state) { packed, work ->
+                val (pair, link) = packed
                 val (snap, msg) = pair
-                if (!snap.startupReady) {
-                    HomeUiState(message = msg)
-                } else {
-                    val isDefault = LaunchController.isDefaultHome(getApplication())
-                    val nlsNeedsGrant = snap.prefs.nlsFilterEnabled &&
-                        !NlsStatus.isGranted(getApplication())
-                    HomeUiState(
-                        prefsReady = true,
-                        iconsReady = snap.iconsLoaded,
-                        setupDone = snap.prefs.setupDone,
-                        isDefaultHome = isDefault,
-                        apps = visible(snap.prefs, snap.apps),
-                        message = msg,
-                        banner = selectHomeBanner(
-                            setupDone = snap.prefs.setupDone,
-                            isDefaultHome = isDefault,
-                            nlsNeedsGrant = nlsNeedsGrant,
-                        ),
-                    )
-                }
-            }.combine(app.workCatalog.state) { ui, work ->
-                val showWork = work.loaded && WorkCatalogRules.showSection(work.hasWorkProfile)
-                ui.copy(
-                    workProfile = showWork,
-                    workApps = if (showWork) work.apps else emptyList(),
-                )
+                buildUi(snap, msg, link, work)
+            }.combine(app.workCatalog.icons) { ui, icons ->
+                ui.copy(workIcons = icons)
+            }.combine(app.workCatalog.iconEpoch) { ui, epoch ->
+                ui.copy(workIconEpoch = epoch)
             }.collect { _state.value = it }
         }
     }
 
     fun onResume() {
         resumeTick.value += 1
+        refreshDeviceFacts()
         app.registry.refreshIfPackagesChanged()
         app.workCatalog.refresh()
     }
 
+    fun refreshWork() {
+        val ctx = getApplication<Application>()
+        app.workCatalog.refresh(manual = true) { before, after ->
+            val changed = WorkCatalogRules.refreshChanged(before.snapshot(), after.snapshot())
+            message.value = ctx.getString(
+                if (changed) R.string.work_refreshed else R.string.work_refresh_noop,
+            )
+        }
+    }
+
     fun showOpenFail() {
-        message.value = getApplication<Application>().getString(com.foco.launcher.R.string.open_fail)
+        message.value = getApplication<Application>().getString(R.string.open_fail)
+    }
+
+    fun showQuietBlocked() {
+        message.value = getApplication<Application>().getString(R.string.work_quiet_tap)
     }
 
     fun clearMessage() {
         message.value = null
+    }
+
+    fun removePersonal(packageName: String) {
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                prefs.copy(entries = WhitelistMutations.remove(prefs.entries, packageName))
+            }
+        }
+    }
+
+    fun ensureWorkIcon(key: String) {
+        app.workCatalog.ensureIcon(key)
+    }
+
+    private fun refreshDeviceFacts() {
+        viewModelScope.launch(Dispatchers.Default) {
+            workLinkResolved.value = LaunchController.workProfileSettingsResolves(getApplication())
+        }
+    }
+
+    private fun buildUi(
+        snap: StartupSnap,
+        msg: String?,
+        linkResolved: Boolean,
+        work: WorkHomeState,
+    ): HomeUiState {
+        if (!snap.startupReady) {
+            return HomeUiState(message = msg)
+        }
+        val isDefault = LaunchController.isDefaultHome(getApplication())
+        val nlsNeedsGrant = snap.prefs.nlsFilterEnabled && !NlsStatus.isGranted(getApplication())
+        val kind = if (!work.loaded) {
+            WorkSectionKind.Hidden
+        } else {
+            WorkCatalogRules.sectionKind(
+                hasWorkProfile = work.hasWorkProfile,
+                loadFailed = work.loadFailed,
+                quietEnabled = work.quietEnabled,
+                activityCount = work.apps.size,
+            )
+        }
+        val shown = if (kind == WorkSectionKind.Hidden) emptyList() else work.apps
+        return HomeUiState(
+            prefsReady = true,
+            iconsReady = snap.iconsLoaded,
+            setupDone = snap.prefs.setupDone,
+            isDefaultHome = isDefault,
+            apps = visible(snap.prefs, snap.apps),
+            message = msg,
+            banner = selectHomeBanner(
+                setupDone = snap.prefs.setupDone,
+                isDefaultHome = isDefault,
+                nlsNeedsGrant = nlsNeedsGrant,
+            ),
+            filterActive = NlsStatus.isFilterActive(getApplication(), snap.prefs.nlsFilterEnabled),
+            workPresence = LaunchpadRules.workPresence(
+                loaded = work.loaded,
+                hasWorkProfile = work.hasWorkProfile,
+                quietEnabled = work.quietEnabled,
+                loadFailed = work.loadFailed,
+            ),
+            workKind = kind,
+            workApps = shown,
+            workRefreshing = work.refreshing,
+            workLink = LaunchpadRules.showWorkSettingsLink(linkResolved, work.hasWorkProfile),
+            showBio = BiometricGate.ENABLED_IN_LAUNCH_PATH,
+            bioOnCount = if (BiometricGate.ENABLED_IN_LAUNCH_PATH) {
+                snap.prefs.entries.count { it.bioEnabled }
+            } else {
+                0
+            },
+        )
     }
 
     private data class StartupSnap(

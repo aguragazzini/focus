@@ -47,6 +47,8 @@ class SettingsActivity : ComponentActivity() {
                     onSkipNls = vm::skipNlsOnboarding,
                     onSetNotifAllowed = vm::setNotifAllowed,
                     onNlsMessageShown = vm::clearNlsMessage,
+                    onRefreshWork = vm::refreshWorkList,
+                    onOpenWorkSettings = { LaunchController.openWorkProfileSettings(this) },
                 )
             }
         }
@@ -62,8 +64,10 @@ class SettingsActivity : ComponentActivity() {
         super.onResume()
         vm.refreshDefault(LaunchController.isDefaultHome(this))
         vm.refreshNls()
+        vm.setWorkLinkResolved(LaunchController.workProfileSettingsResolves(this))
         (application as FocoApp).registry.refreshIfPackagesChanged()
         (application as FocoApp).registry.invalidate()
+        (application as FocoApp).workCatalog.refresh()
     }
 
     companion object {

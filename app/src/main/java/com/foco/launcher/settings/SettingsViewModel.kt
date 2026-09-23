@@ -8,11 +8,14 @@ import androidx.lifecycle.viewModelScope
 import com.foco.launcher.FocoApp
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.UserProfileHelper
+import com.foco.launcher.core.LaunchpadRules
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.registry.WhitelistMutations
 import com.foco.launcher.security.BiometricGate
+import com.foco.launcher.work.WorkCatalogRules
+import com.foco.launcher.work.snapshot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,6 +48,14 @@ data class SettingsUiState(
     val hasWorkProfile: Boolean = false,
     val avisosRows: List<AvisosRow> = emptyList(),
     val nlsMessage: String? = null,
+    val workLoaded: Boolean = false,
+    val workProfile: Boolean = false,
+    val workQuiet: Boolean? = null,
+    val workFailed: Boolean = false,
+    val workCount: Int = 0,
+    val workRefreshing: Boolean = false,
+    val workLink: Boolean = false,
+    val workNote: String? = null,
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -55,6 +66,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val removeCandidate = MutableStateFlow<LaunchableApp?>(null)
     private val nlsTick = MutableStateFlow(0)
     private val nlsMessage = MutableStateFlow<String?>(null)
+    private val workLink = MutableStateFlow(false)
+    private val workNote = MutableStateFlow<String?>(null)
 
     private val _state = MutableStateFlow(SettingsUiState())
     val state: StateFlow<SettingsUiState> = _state.asStateFlow()
@@ -75,6 +88,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
                 .combine(nlsMessage) { ui, msg -> ui.copy(nlsMessage = msg) }
                 .combine(isDefault) { ui, defaultHome -> ui.copy(isDefaultHome = defaultHome) }
+                .combine(app.workCatalog.state) { ui, work ->
+                    ui.copy(
+                        workLoaded = work.loaded,
+                        workProfile = work.hasWorkProfile,
+                        workQuiet = work.quietEnabled,
+                        workFailed = work.loadFailed,
+                        workCount = work.apps.size,
+                        workRefreshing = work.refreshing,
+                    )
+                }
+                .combine(workLink) { ui, link -> ui.copy(workLink = link) }
+                .combine(workNote) { ui, note -> ui.copy(workNote = note) }
                 .collect { _state.value = it }
         }
     }
@@ -125,6 +150,21 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun refreshDefault(value: Boolean) {
         isDefault.value = value
+    }
+
+    fun setWorkLinkResolved(resolved: Boolean) {
+        workLink.value = resolved
+    }
+
+    fun refreshWorkList() {
+        val ctx = getApplication<Application>()
+        workNote.value = null
+        app.workCatalog.refresh(manual = true) { before, after ->
+            val changed = WorkCatalogRules.refreshChanged(before.snapshot(), after.snapshot())
+            workNote.value = ctx.getString(
+                if (changed) com.foco.launcher.R.string.work_refreshed else com.foco.launcher.R.string.work_refresh_noop,
+            )
+        }
     }
 
     fun refreshNls() {
@@ -239,9 +279,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val selected = core.prefs.entries.map { it.packageName }.toSet()
         // Personal launcher activities only. Work-profile activities stay in WorkCatalog.
         val catalog = core.all.filterNot { it.packageName in selected }
-        val settingsPkg = core.all.find {
-            SuggestedApps.isSystemSettings(getApplication(), it.packageName)
-        }?.packageName
+        val settingsPkg = SuggestedApps.settingsPackage(getApplication())
         val granted = NlsStatus.isGranted(getApplication())
         val allowByPkg = core.prefs.entries.associate { it.packageName to it.allowNotif }
         val rows = whitelist.map { appItem ->
@@ -261,7 +299,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             settingsPackage = settingsPkg,
             removeCandidate = remove,
             removeIsLast = remove != null && whitelist.size <= 1,
-            removeIsSettings = remove != null && settingsPkg != null && remove.packageName == settingsPkg,
+            removeIsSettings = remove != null &&
+                LaunchpadRules.needsSettingsConfirm(remove.packageName, settingsPkg),
             nlsFilterEnabled = core.prefs.nlsFilterEnabled,
             nlsGranted = granted,
             nlsActive = NlsStatus.isFilterActive(getApplication(), core.prefs.nlsFilterEnabled),

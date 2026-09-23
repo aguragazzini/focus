@@ -1,7 +1,8 @@
-@file:OptIn(ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
 
 package com.foco.launcher.core
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -20,42 +21,61 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Work
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import android.graphics.Bitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.foco.launcher.R
 import com.foco.launcher.registry.LaunchableApp
+import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.work.WorkApp
+import com.foco.launcher.work.WorkCatalogRules
+import com.foco.launcher.work.WorkSectionKind
 
 @Composable
 fun HomeLoading(modifier: Modifier = Modifier) {
@@ -91,19 +111,42 @@ fun HomeScreen(
     onAddApps: () -> Unit,
     onChooseDefault: () -> Unit,
     onOpenAvisos: () -> Unit,
+    onRefreshWork: () -> Unit,
+    onRemovePersonal: (String) -> Unit,
+    onEnsureWorkIcon: (String) -> Unit,
+    onOpenWorkSettings: () -> Unit,
+    onQuietTap: () -> Unit,
     onMessageShown: () -> Unit,
 ) {
     val snackbar = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    var sheetApp by remember { mutableStateOf<LaunchableApp?>(null) }
+    var confirmApp by remember { mutableStateOf<LaunchableApp?>(null) }
+    var workQuery by rememberSaveable { mutableStateOf("") }
+
     LaunchedEffect(state.message) {
         val msg = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(msg)
         onMessageShown()
     }
 
+    val workVisible = remember(state.workApps, workQuery, state.workKind) {
+        val allowed = WorkCatalogRules.showSearch(state.workKind, state.workApps.size)
+        val query = if (allowed) workQuery else ""
+        WorkCatalogRules.filterVisible(
+            items = state.workApps,
+            query = query,
+            label = { it.label },
+            packageName = { it.packageName },
+        )
+    }
+    val searchOpen = WorkCatalogRules.showSearch(state.workKind, state.workApps.size)
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
+        Box(Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -112,87 +155,234 @@ fun HomeScreen(
                 .navigationBarsPadding(),
         ) {
             HomeOverflow(
-                onOpenFocoSettings = onOpenFocoSettings,
+                showWorkRefresh = state.workKind != WorkSectionKind.Hidden,
+                onAddApps = onAddApps,
                 onEditApps = onEditApps,
+                onOpenFocoSettings = onOpenFocoSettings,
+                onChooseDefault = onChooseDefault,
                 onOpenSystemSettings = onOpenSystemSettings,
+                onRefreshWork = onRefreshWork,
             )
-
+            StatusStrip(state = state, onOpenFocoSettings = onOpenFocoSettings)
             when (state.banner) {
                 HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
                 HomeBanner.Nls -> NlsOffBanner(onOpenAvisos)
                 HomeBanner.None -> Unit
             }
-
-            if (state.apps.isEmpty() && !state.workProfile) {
-                EmptyHome(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                        .longPressEmpty(onOpenSystemSettings),
-                    onAddApps = onAddApps,
-                    onOpenSystemSettings = onOpenSystemSettings,
-                )
-            } else {
-                Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 24.dp, vertical = 16.dp),
-                    ) {
-                        SectionTitle(stringResource(R.string.section_personal))
-                        Spacer(Modifier.height(12.dp))
-                        if (state.apps.isEmpty()) {
-                            PersonalEmptyInline(
-                                onAddApps = onAddApps,
-                                onOpenSystemSettings = onOpenSystemSettings,
-                            )
-                        } else {
-                            AppGrid(state.apps.map { it.toCell() }) { cell ->
-                                onLaunch(cell.id)
+            LazyColumn(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    horizontal = 24.dp,
+                    vertical = 16.dp,
+                ),
+            ) {
+                item(key = "personal-header") {
+                    PersonalHeader(
+                        hasApps = state.apps.isNotEmpty(),
+                        onEdit = onEditApps,
+                        onAdd = onAddApps,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+                if (state.apps.isEmpty()) {
+                    item(key = "personal-empty") {
+                        PersonalEmptyInline(onOpenSystemSettings = onOpenSystemSettings)
+                    }
+                } else {
+                    val rows = state.apps.map { it.toCell() }.chunked(4)
+                    items(
+                        items = rows,
+                        key = { row -> "p:" + row.joinToString("|") { it.id } },
+                    ) { row ->
+                        AppRow(
+                            cells = row,
+                            iconEpoch = 0L,
+                            onClick = { cell -> onLaunch(cell.id) },
+                            onLongClick = { cell ->
+                                state.apps.firstOrNull { it.packageName == cell.id }?.let { sheetApp = it }
+                            },
+                            onEnsureIcon = null,
+                        )
+                    }
+                }
+                if (state.workKind != WorkSectionKind.Hidden) {
+                    item(key = "work-divider") {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
+                            thickness = 1.dp,
+                            color = FocoLine,
+                        )
+                    }
+                    item(key = "work-header") {
+                        WorkHeader(
+                            kind = state.workKind,
+                            count = WorkCatalogRules.headerCount(state.workApps.size),
+                            refreshing = state.workRefreshing,
+                            query = if (searchOpen) workQuery else "",
+                            showSearch = searchOpen,
+                            showQuietLink = state.workLink,
+                            onQuery = { workQuery = it },
+                            onRefresh = onRefreshWork,
+                            onOpenWorkSettings = onOpenWorkSettings,
+                        )
+                    }
+                    when {
+                        WorkCatalogRules.showErrorCopy(state.workKind) -> {
+                            item(key = "work-error") {
+                                Text(
+                                    text = stringResource(R.string.work_load_error),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                                FocoTextButton(onClick = onRefreshWork) {
+                                    Text(stringResource(R.string.work_retry))
+                                }
                             }
                         }
-                        if (state.workProfile) {
-                            Spacer(Modifier.height(28.dp))
-                            SectionTitle(stringResource(R.string.section_work))
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = stringResource(R.string.work_sub),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(12.dp))
-                            if (state.workApps.isEmpty()) {
+                        WorkCatalogRules.showWorkEmptyCopy(state.workKind) -> {
+                            item(key = "work-empty") {
                                 Text(
                                     text = stringResource(R.string.work_empty),
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
-                            } else {
-                                val byKey = state.workApps.associateBy { it.key }
-                                AppGrid(state.workApps.map { it.toCell() }) { cell ->
-                                    byKey[cell.id]?.let(onLaunchWork)
-                                }
+                            }
+                        }
+                        searchOpen && workQuery.isNotBlank() && workVisible.isEmpty() -> {
+                            item(key = "work-search-empty") {
+                                Text(
+                                    text = stringResource(R.string.work_search_empty),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                        WorkCatalogRules.showWorkGrid(state.workKind, workVisible.size) -> {
+                            val byKey = state.workApps.associateBy { it.key }
+                            val muted = state.workKind == WorkSectionKind.Quiet
+                            val rows = workVisible.map { app ->
+                                app.toCell(state.workIcons[app.key], muted)
+                            }.chunked(4)
+                            items(
+                                items = rows,
+                                key = { row -> "w:" + row.joinToString("|") { it.id } },
+                            ) { row ->
+                                AppRow(
+                                    cells = row,
+                                    iconEpoch = state.workIconEpoch,
+                                    onClick = { cell ->
+                                        if (muted) {
+                                            onQuietTap()
+                                        } else {
+                                            byKey[cell.id]?.let(onLaunchWork)
+                                        }
+                                    },
+                                    onLongClick = null,
+                                    onEnsureIcon = { cell -> onEnsureWorkIcon(cell.id) },
+                                )
                             }
                         }
                     }
+                }
+                item(key = "escape") {
                     Box(
                         modifier = Modifier
-                            .weight(1f)
                             .fillMaxWidth()
+                            .height(120.dp)
                             .longPressEmpty(onOpenSystemSettings),
                     )
                 }
             }
+        }
+
+    val pressed = sheetApp
+    if (pressed != null) {
+        ModalBottomSheet(
+            onDismissRequest = { sheetApp = null },
+            containerColor = FocoInkElevated,
+            contentColor = FocoPaper,
+            tonalElevation = 0.dp,
+            dragHandle = { BottomSheetDefaults.DragHandle(color = FocoPaperDim) },
+            shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp),
+            ) {
+                Text(
+                    text = pressed.label,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FocoPaper,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                )
+                SheetAction(
+                    label = stringResource(R.string.lp_remove),
+                    onClick = {
+                        val target = pressed
+                        sheetApp = null
+                        val settingsPkg = SuggestedApps.settingsPackage(context)
+                        if (LaunchpadRules.needsSettingsConfirm(target.packageName, settingsPkg)) {
+                            confirmApp = target
+                        } else {
+                            onRemovePersonal(target.packageName)
+                        }
+                    },
+                )
+                SheetAction(
+                    label = stringResource(R.string.lp_open),
+                    onClick = {
+                        val pkg = pressed.packageName
+                        sheetApp = null
+                        onLaunch(pkg)
+                    },
+                )
+            }
+        }
+    }
+
+    val pendingConfirm = confirmApp
+    if (pendingConfirm != null) {
+        AlertDialog(
+            onDismissRequest = { confirmApp = null },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            text = {
+                Text(
+                    text = stringResource(R.string.confirm_remove_settings),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            },
+            confirmButton = {
+                FocoTextButton(
+                    onClick = {
+                        onRemovePersonal(pendingConfirm.packageName)
+                        confirmApp = null
+                    },
+                ) { Text(stringResource(R.string.confirm_remove_anyway)) }
+            },
+            dismissButton = {
+                FocoTextButton(onClick = { confirmApp = null }) {
+                    Text(stringResource(R.string.confirm_leave))
+                }
+            },
+        )
+    }
         }
     }
 }
 
 @Composable
 private fun HomeOverflow(
-    onOpenFocoSettings: () -> Unit,
+    showWorkRefresh: Boolean,
+    onAddApps: () -> Unit,
     onEditApps: () -> Unit,
+    onOpenFocoSettings: () -> Unit,
+    onChooseDefault: () -> Unit,
     onOpenSystemSettings: () -> Unit,
+    onRefreshWork: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
     Row(
@@ -212,29 +402,72 @@ private fun HomeOverflow(
                 )
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.home_edit_apps)) },
-                    onClick = {
-                        menu = false
-                        onEditApps()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.home_open_settings)) },
-                    onClick = {
-                        menu = false
-                        onOpenFocoSettings()
-                    },
-                )
-                DropdownMenuItem(
-                    text = { Text(stringResource(R.string.home_system_settings)) },
-                    onClick = {
-                        menu = false
-                        onOpenSystemSettings()
-                    },
-                )
+                OverflowItem(R.string.menu_add, { menu = false; onAddApps() })
+                OverflowItem(R.string.menu_edit, { menu = false; onEditApps() })
+                OverflowItem(R.string.menu_settings, { menu = false; onOpenFocoSettings() })
+                OverflowItem(R.string.menu_default, { menu = false; onChooseDefault() })
+                OverflowItem(R.string.menu_system, { menu = false; onOpenSystemSettings() })
+                if (showWorkRefresh) {
+                    OverflowItem(R.string.menu_refresh_work, { menu = false; onRefreshWork() })
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun OverflowItem(label: Int, onClick: () -> Unit) {
+    DropdownMenuItem(
+        text = { Text(stringResource(label)) },
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun StatusStrip(state: HomeUiState, onOpenFocoSettings: () -> Unit) {
+    val filterWord = stringResource(
+        if (state.filterActive) R.string.strip_filter_on else R.string.strip_filter_off,
+    )
+    val workWord = stringResource(
+        when (state.workPresence) {
+            WorkPresence.Unknown -> R.string.strip_work_unknown
+            WorkPresence.Yes -> R.string.strip_work_yes
+            WorkPresence.No -> R.string.strip_work_no
+            WorkPresence.Paused -> R.string.strip_work_pause
+        },
+    )
+    val parts = buildList {
+        add(stringResource(R.string.strip_personal, state.apps.size))
+        add(stringResource(R.string.strip_filter, filterWord))
+        add(stringResource(R.string.strip_work, workWord))
+        if (LaunchpadRules.showBioCell(state.showBio)) {
+            val bio = if (state.bioOnCount > 0) {
+                stringResource(R.string.strip_bio_on, state.bioOnCount)
+            } else {
+                stringResource(R.string.strip_bio_off)
+            }
+            add(stringResource(R.string.strip_bio, bio))
+        }
+    }
+    val line = LaunchpadRules.joinStatus(parts)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp)
+            .padding(top = 2.dp, bottom = 8.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(FocoInkElevated)
+            .clickable(onClick = onOpenFocoSettings)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = line,
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -282,53 +515,158 @@ private fun BannerRow(message: String, action: String, onAction: () -> Unit) {
 }
 
 @Composable
-private fun EmptyHome(
-    modifier: Modifier,
-    onAddApps: () -> Unit,
-    onOpenSystemSettings: () -> Unit,
+private fun PersonalHeader(hasApps: Boolean, onEdit: () -> Unit, onAdd: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SectionTitle(
+            text = stringResource(R.string.section_personal),
+            modifier = Modifier.weight(1f),
+        )
+        HeaderAction(
+            text = stringResource(if (hasApps) R.string.personal_edit else R.string.home_add),
+            onClick = if (hasApps) onEdit else onAdd,
+        )
+    }
+}
+
+@Composable
+private fun WorkHeader(
+    kind: WorkSectionKind,
+    count: Int,
+    refreshing: Boolean,
+    query: String,
+    showSearch: Boolean,
+    showQuietLink: Boolean,
+    onQuery: (String) -> Unit,
+    onRefresh: () -> Unit,
+    onOpenWorkSettings: () -> Unit,
 ) {
-    Column(
-        modifier = modifier.padding(horizontal = 24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
+    val focus = LocalFocusManager.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stringResource(R.string.home_empty),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onBackground,
-            textAlign = TextAlign.Center,
+            text = stringResource(R.string.section_work),
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = FontWeight.Medium,
+                letterSpacing = 0.04.em,
+            ),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        Icon(
+            imageVector = Icons.Outlined.Work,
+            contentDescription = stringResource(R.string.cd_work_badge),
+            modifier = Modifier
+                .padding(start = 6.dp)
+                .size(18.dp),
+            tint = FocoPaperDim,
+        )
+        if (WorkCatalogRules.showWorkCount(kind)) {
+            Text(
+                text = stringResource(R.string.work_count, count),
+                style = MaterialTheme.typography.bodyMedium,
+                color = FocoPaperDim,
+                modifier = Modifier.padding(start = 6.dp),
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        IconButton(onClick = onRefresh, enabled = !refreshing) {
+            if (refreshing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp),
+                    strokeWidth = 2.dp,
+                    color = FocoPaperDim,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Outlined.Refresh,
+                    contentDescription = stringResource(R.string.work_refresh),
+                    modifier = Modifier.size(20.dp),
+                    tint = FocoPaperDim,
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text = stringResource(R.string.work_sub),
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+    if (WorkCatalogRules.showQuietCopy(kind)) {
         Spacer(Modifier.height(8.dp))
         Text(
-            text = stringResource(R.string.home_empty_hint),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
+            text = stringResource(R.string.work_quiet_title),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(Modifier.height(20.dp))
-        FocoTextButton(onClick = onAddApps) {
-            Text(stringResource(R.string.home_add))
+        if (showQuietLink) {
+            FocoTextButton(onClick = onOpenWorkSettings) {
+                Text(stringResource(R.string.work_quiet_cta))
+            }
         }
+    }
+    if (showSearch) {
+        Spacer(Modifier.height(8.dp))
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQuery,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(color = FocoPaper),
+            placeholder = {
+                Text(
+                    text = stringResource(R.string.work_search),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
+            shape = RoundedCornerShape(12.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = FocoPaper,
+                unfocusedTextColor = FocoPaper,
+                focusedBorderColor = FocoPaperDim,
+                unfocusedBorderColor = FocoLine,
+                cursorColor = FocoPaper,
+                focusedPlaceholderColor = FocoPaperDim,
+                unfocusedPlaceholderColor = FocoPaperDim,
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+            ),
+        )
+    }
+    Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun PersonalEmptyInline(onOpenSystemSettings: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().longPressEmpty(onOpenSystemSettings)) {
+        Text(
+            text = stringResource(R.string.home_empty),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = stringResource(R.string.home_empty_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         FocoTextButton(onClick = onOpenSystemSettings) {
             Text(stringResource(R.string.home_system_settings))
         }
     }
 }
 
-private data class HomeCell(
-    val id: String,
-    val label: String,
-    val icon: Bitmap,
-)
-
-private fun LaunchableApp.toCell(): HomeCell = HomeCell(packageName, label, icon)
-
-private fun WorkApp.toCell(): HomeCell = HomeCell(key, label, icon)
-
 @Composable
-private fun SectionTitle(text: String) {
+private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
+        modifier = modifier,
         style = MaterialTheme.typography.bodyMedium.copy(
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.04.em,
@@ -338,73 +676,119 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun PersonalEmptyInline(
-    onAddApps: () -> Unit,
-    onOpenSystemSettings: () -> Unit,
-) {
+private fun HeaderAction(text: String, onClick: () -> Unit) {
     Text(
-        text = stringResource(R.string.home_empty),
+        text = text,
+        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+        color = FocoPaperDim,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 10.dp),
+    )
+}
+
+@Composable
+private fun SheetAction(label: String, onClick: () -> Unit) {
+    Text(
+        text = label,
         style = MaterialTheme.typography.bodyLarge,
-        color = MaterialTheme.colorScheme.onBackground,
+        color = FocoPaper,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 16.dp),
     )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        text = stringResource(R.string.home_empty_hint),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-    FocoTextButton(onClick = onAddApps) {
-        Text(stringResource(R.string.home_add))
-    }
-    FocoTextButton(onClick = onOpenSystemSettings) {
-        Text(stringResource(R.string.home_system_settings))
-    }
 }
 
+private data class HomeCell(
+    val id: String,
+    val label: String,
+    val icon: Bitmap?,
+    val muted: Boolean = false,
+)
+
+private fun LaunchableApp.toCell(): HomeCell = HomeCell(packageName, label, icon)
+
+private fun WorkApp.toCell(icon: Bitmap?, muted: Boolean): HomeCell = HomeCell(key, label, icon, muted)
+
 @Composable
-private fun AppGrid(cells: List<HomeCell>, onClick: (HomeCell) -> Unit) {
-    cells.chunked(4).forEach { row ->
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            row.forEach { cell ->
-                AppCell(
-                    cell = cell,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onClick(cell) },
-                )
-            }
-            repeat(4 - row.size) {
-                Spacer(Modifier.weight(1f))
-            }
+private fun AppRow(
+    cells: List<HomeCell>,
+    iconEpoch: Long,
+    onClick: (HomeCell) -> Unit,
+    onLongClick: ((HomeCell) -> Unit)?,
+    onEnsureIcon: ((HomeCell) -> Unit)?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        cells.forEach { cell ->
+            AppCell(
+                cell = cell,
+                iconEpoch = iconEpoch,
+                modifier = Modifier.weight(1f),
+                onClick = { onClick(cell) },
+                onLongClick = onLongClick?.let { callback -> { callback(cell) } },
+                onEnsureIcon = onEnsureIcon?.let { callback -> { callback(cell) } },
+            )
         }
-        Spacer(Modifier.height(16.dp))
+        repeat(4 - cells.size) {
+            Spacer(Modifier.weight(1f))
+        }
     }
+    Spacer(Modifier.height(16.dp))
 }
 
 @Composable
-private fun AppCell(cell: HomeCell, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val bitmap = remember(cell.id, cell.icon) { cell.icon.asImageBitmap() }
+private fun AppCell(
+    cell: HomeCell,
+    iconEpoch: Long,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)?,
+    onEnsureIcon: (() -> Unit)?,
+) {
+    if (onEnsureIcon != null) {
+        LaunchedEffect(cell.id, iconEpoch) { onEnsureIcon() }
+    }
+    val bitmap = cell.icon
+    val image = if (bitmap != null) remember(cell.id, bitmap) { bitmap.asImageBitmap() } else null
+    val iconAlpha = if (cell.muted) 0.4f else 1f
     Column(
         modifier = modifier
-            .clickable(onClick = onClick)
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+            )
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Image(
-            bitmap = bitmap,
-            contentDescription = cell.label,
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(12.dp)),
-            contentScale = ContentScale.Fit,
-        )
+        if (image != null) {
+            Image(
+                bitmap = image,
+                contentDescription = cell.label,
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .alpha(iconAlpha),
+                contentScale = ContentScale.Fit,
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(FocoLine)
+                    .alpha(iconAlpha),
+            )
+        }
         Spacer(Modifier.height(6.dp))
         Text(
             text = cell.label,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onBackground,
+            color = if (cell.muted) FocoPaperDim else MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
