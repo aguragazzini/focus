@@ -38,6 +38,7 @@ fun HomeClock(
     modifier: Modifier = Modifier,
     nowMillis: () -> Long = System::currentTimeMillis,
     zone: ZoneId = ZoneId.systemDefault(),
+    readGlance: () -> String? = { null },
 ) {
     var now by remember { mutableLongStateOf(nowMillis()) }
     LaunchedEffect(zone) {
@@ -51,6 +52,7 @@ fun HomeClock(
     }
     val time = HomeClockFormat.time(now, zone)
     val date = HomeClockFormat.date(now, zone)
+    val glance = readGlance()
     val timeCd = stringResource(R.string.clock_time_cd, time)
     val dateCd = stringResource(R.string.clock_date_cd, date)
     Column(
@@ -96,5 +98,20 @@ fun HomeClock(
             ),
             textAlign = TextAlign.Center,
         )
+        if (!glance.isNullOrBlank()) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = glance,
+                modifier = Modifier.padding(horizontal = 12.dp),
+                style = TextStyle(
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = HomeGlanceFormat.GLANCE_SP.sp,
+                    lineHeight = 16.sp,
+                    color = FocoPaperDim,
+                ),
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }

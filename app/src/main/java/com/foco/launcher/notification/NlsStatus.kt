@@ -47,9 +47,13 @@ object NlsStatus {
         return false
     }
 
-    /** Filtering is only "active" with both the flag and the system grant. */
-    fun isFilterActive(context: Context, nlsFilterEnabled: Boolean): Boolean {
-        return nlsFilterEnabled && isGranted(context)
+    /** "Activo" only when the toggle is on, the grant is real, and the service is bound. */
+    fun isFilterActive(context: Context, nlsFilterEnabled: Boolean, connected: Boolean): Boolean {
+        return NlsRecovery.filterIsActive(
+            granted = isGranted(context),
+            filterEnabled = nlsFilterEnabled,
+            connected = connected,
+        )
     }
 
     private fun readGranted(app: Context): Boolean {

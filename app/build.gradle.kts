@@ -13,7 +13,7 @@ android {
         applicationId = "com.foco.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
+        versionCode = 8
         versionName = "0.5.1"
     }
 

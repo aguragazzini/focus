@@ -74,6 +74,7 @@ fun SettingsHost(
     onMoveDown: (String) -> Unit,
     onToggleFilter: (Boolean) -> Unit,
     onOpenNlsSettings: () -> Unit,
+    onOpenAppInfo: () -> Unit,
     onSkipNls: () -> Unit,
     onSetNotifAllowed: (String, Boolean) -> Unit,
     onNlsMessageShown: () -> Unit,
@@ -112,11 +113,15 @@ fun SettingsHost(
             onBack = onBack,
             onToggleFilter = onToggleFilter,
             onOpenNlsSettings = onOpenNlsSettings,
+            onOpenAppInfo = onOpenAppInfo,
             onSetNotifAllowed = onSetNotifAllowed,
             onNlsMessageShown = onNlsMessageShown,
         )
         SettingsDest.NlsOnboarding -> NlsOnboardingScreen(
+            showReturnedUngranted = state.nlsShowRestrictedReturn,
+            failMessage = state.nlsMessage,
             onOpenSettings = onOpenNlsSettings,
+            onOpenAppInfo = onOpenAppInfo,
             onSkip = onSkipNls,
         )
     }
@@ -180,7 +185,7 @@ private fun SettingsMain(
                 HorizontalDivider()
                 SettingsRow(
                     title = stringResource(R.string.settings_notifications),
-                    subtitle = stringResource(R.string.settings_notifications_sub),
+                    subtitle = stringResource(notificationsSubtitle(state)),
                     onClick = onOpenAvisos,
                 )
                 HorizontalDivider()
@@ -299,6 +304,15 @@ private fun WorkProfileBlock(
                 }
             }
         }
+    }
+}
+
+private fun notificationsSubtitle(state: SettingsUiState): Int {
+    return when {
+        state.nlsActive -> R.string.nls_filter_status_active
+        !state.nlsGranted -> R.string.nls_settings_need_grant
+        state.nlsFilterEnabled && !state.nlsConnected -> R.string.nls_settings_disconnected
+        else -> R.string.settings_notifications_sub
     }
 }
 

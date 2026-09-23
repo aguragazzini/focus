@@ -51,6 +51,7 @@ class NlsNavigationTest {
         val xml = File("src/main/AndroidManifest.xml").readText()
         assertTrue(xml.contains("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
         assertTrue(xml.contains("android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS"))
+        assertTrue(xml.contains("android.settings.APPLICATION_DETAILS_SETTINGS"))
         assertTrue(xml.contains("android.intent.action.SHOW_ALARMS"))
         assertTrue(xml.contains("android.intent.category.APP_CALENDAR"))
         val settings = xml.substringAfter(".settings.SettingsActivity").substringBefore("</activity>")

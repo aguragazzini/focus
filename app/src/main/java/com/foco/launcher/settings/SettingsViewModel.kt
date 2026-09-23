@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.foco.launcher.FocoApp
+import com.foco.launcher.notification.FocoNotificationListener
+import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.UserProfileHelper
 import com.foco.launcher.core.LaunchpadRules
@@ -44,7 +46,9 @@ data class SettingsUiState(
     val removeIsSettings: Boolean = false,
     val nlsFilterEnabled: Boolean = false,
     val nlsGranted: Boolean = false,
+    val nlsConnected: Boolean = false,
     val nlsActive: Boolean = false,
+    val nlsShowRestrictedReturn: Boolean = false,
     val hasWorkProfile: Boolean = false,
     val avisosRows: List<AvisosRow> = emptyList(),
     val nlsMessage: String? = null,
@@ -66,6 +70,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val removeCandidate = MutableStateFlow<LaunchableApp?>(null)
     private val nlsTick = MutableStateFlow(0)
     private val nlsMessage = MutableStateFlow<String?>(null)
+    private val awaitingGrantReturn = MutableStateFlow(false)
+    private val showRestrictedReturn = MutableStateFlow(false)
     private val workLink = MutableStateFlow(false)
     private val workNote = MutableStateFlow<String?>(null)
 
@@ -100,6 +106,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 }
                 .combine(workLink) { ui, link -> ui.copy(workLink = link) }
                 .combine(workNote) { ui, note -> ui.copy(workNote = note) }
+                .combine(FocoNotificationListener.connected) { ui, connected ->
+                    ui.copy(
+                        nlsConnected = connected,
+                        nlsActive = NlsRecovery.filterIsActive(ui.nlsGranted, ui.nlsFilterEnabled, connected),
+                    )
+                }
+                .combine(showRestrictedReturn) { ui, show -> ui.copy(nlsShowRestrictedReturn = show) }
                 .collect { _state.value = it }
         }
     }
@@ -170,10 +183,22 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun refreshNls() {
         nlsTick.value += 1
         viewModelScope.launch {
-            if (dest.value == SettingsDest.NlsOnboarding && NlsStatus.isGranted(getApplication())) {
+            val granted = NlsStatus.isGranted(getApplication())
+            if (dest.value == SettingsDest.NlsOnboarding && granted) {
+                awaitingGrantReturn.value = false
+                showRestrictedReturn.value = false
                 enableFilterAfterGrant()
+                return@launch
+            }
+            if (awaitingGrantReturn.value && !granted) {
+                showRestrictedReturn.value = true
             }
         }
+    }
+
+    /** User left for the system listener screen. If they come back still ungranted, explain restricted settings. */
+    fun markNlsSettingsOpened() {
+        awaitingGrantReturn.value = true
     }
 
     fun requestEnableFilter(enabled: Boolean) {
@@ -193,6 +218,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun skipNlsOnboarding() {
         viewModelScope.launch {
             app.prefsStore.setNlsFilterEnabled(false)
+            nlsMessage.value = null
+            awaitingGrantReturn.value = false
             dest.value = SettingsDest.Avisos
         }
     }
@@ -307,7 +334,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 LaunchpadRules.needsSettingsConfirm(remove.packageName, settingsPkg),
             nlsFilterEnabled = core.prefs.nlsFilterEnabled,
             nlsGranted = granted,
-            nlsActive = NlsStatus.isFilterActive(getApplication(), core.prefs.nlsFilterEnabled),
+            nlsConnected = FocoNotificationListener.isConnected(),
+            nlsActive = NlsStatus.isFilterActive(
+                getApplication(),
+                core.prefs.nlsFilterEnabled,
+                FocoNotificationListener.isConnected(),
+            ),
             hasWorkProfile = UserProfileHelper.hasWorkProfile(getApplication()),
             avisosRows = rows,
             nlsMessage = message,

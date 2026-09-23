@@ -3,6 +3,9 @@ package com.foco.launcher.notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.foco.launcher.FocoApp
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -13,6 +16,7 @@ class FocoNotificationListener : NotificationListenerService() {
     override fun onListenerConnected() {
         super.onListenerConnected()
         active.set(this)
+        connectedState.value = true
         scrubActive()
     }
 
@@ -27,7 +31,9 @@ class FocoNotificationListener : NotificationListenerService() {
     }
 
     override fun onListenerDisconnected() {
-        active.compareAndSet(this, null)
+        if (active.compareAndSet(this, null)) {
+            connectedState.value = active.get() != null
+        }
         super.onListenerDisconnected()
         // Sideload / OEM unbind: the grant can still be on while posted() never runs.
         NlsStatus.requestRebind(this)
@@ -54,6 +60,12 @@ class FocoNotificationListener : NotificationListenerService() {
 
     companion object {
         private val active = AtomicReference<FocoNotificationListener?>(null)
+        private val connectedState = MutableStateFlow(false)
+
+        /** True only while the system has this service bound. */
+        val connected: StateFlow<Boolean> = connectedState.asStateFlow()
+
+        fun isConnected(): Boolean = active.get() != null
 
         fun scrubIfConnected() {
             active.get()?.scrubActive()

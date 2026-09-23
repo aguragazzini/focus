@@ -35,6 +35,10 @@
         <intent>
             <action android:name="android.settings.NOTIFICATION_LISTENER_DETAIL_SETTINGS" />
         </intent>
+        <intent>
+            <action android:name="android.settings.APPLICATION_DETAILS_SETTINGS" />
+            <data android:scheme="package" />
+        </intent>
         <!-- So resolveActivity can see managed-profile settings on API 30+. Omitted from UI if unresolved. -->
         <intent>
             <action android:name="android.settings.MANAGED_PROFILE_SETTINGS" />

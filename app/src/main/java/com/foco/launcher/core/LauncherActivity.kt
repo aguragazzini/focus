@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foco.launcher.FocoApp
+import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.settings.SettingsActivity
 import com.foco.launcher.settings.SetupActivity
@@ -63,25 +64,24 @@ class LauncherActivity : ComponentActivity() {
                             vm.showOpenFail()
                         }
                     },
-                    onOpenFocoSettings = {
-                        startActivity(SettingsActivity.intent(this))
-                    },
+                    onOpenFocoSettings = { openFocoSettings(SettingsActivity.DEST_MAIN) },
                     onOpenSystemSettings = {
                         if (!LaunchController.openSystemSettings(this)) vm.showOpenFail()
                     },
                     onOpenClock = { LaunchController.openClock(this) },
                     onOpenCalendar = { LaunchController.openCalendar(this) },
-                    onEditApps = {
-                        startActivity(SettingsActivity.intent(this, SettingsActivity.DEST_EDIT))
-                    },
-                    onAddApps = {
-                        startActivity(SettingsActivity.intent(this, SettingsActivity.DEST_ADD))
-                    },
+                    onEditApps = { openFocoSettings(SettingsActivity.DEST_EDIT) },
+                    onAddApps = { openFocoSettings(SettingsActivity.DEST_ADD) },
                     onChooseDefault = {
                         LaunchController.openHomePicker(this)
                     },
                     onOpenAvisos = {
-                        startActivity(SettingsActivity.intent(this, SettingsActivity.DEST_AVISOS))
+                        val dest = if (vm.state.value.nlsAttention == NlsRecovery.Attention.Disconnected) {
+                            SettingsActivity.DEST_AVISOS
+                        } else {
+                            SettingsActivity.DEST_NLS_ONBOARDING
+                        }
+                        openFocoSettings(dest)
                     },
                     onRefreshWork = vm::refreshWork,
                     onRemovePersonal = vm::removePersonal,
@@ -99,5 +99,13 @@ class LauncherActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         if (::vm.isInitialized) vm.onResume()
+    }
+
+    private fun openFocoSettings(dest: String) {
+        try {
+            startActivity(SettingsActivity.intent(this, dest))
+        } catch (_: Exception) {
+            vm.showOpenFail()
+        }
     }
 }

@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.foco.launcher.R
+import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.work.WorkApp
@@ -174,13 +175,17 @@ fun HomeScreen(
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
                         modifier = Modifier.padding(horizontal = 24.dp),
+                        readGlance = { HomeGlance.line(context) },
                     )
                     Spacer(Modifier.height(32.dp))
                 }
                 item(key = "banner") {
                     when (state.banner) {
                         HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
-                        HomeBanner.Nls -> NlsOffBanner(onOpenAvisos)
+                        HomeBanner.Nls -> NlsOffBanner(
+                            disconnected = state.nlsAttention == NlsRecovery.Attention.Disconnected,
+                            onOpenAvisos = onOpenAvisos,
+                        )
                         HomeBanner.None -> Unit
                     }
                     if (state.banner != HomeBanner.None) {
@@ -401,6 +406,13 @@ private fun HomeOverflow(
     onRefreshWork: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
+    LaunchedEffect(menu, pending) {
+        if (menu || pending == null) return@LaunchedEffect
+        val action = pending
+        pending = null
+        action?.invoke()
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -418,13 +430,13 @@ private fun HomeOverflow(
                 )
             }
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                OverflowItem(R.string.menu_add, { menu = false; onAddApps() })
-                OverflowItem(R.string.menu_edit, { menu = false; onEditApps() })
-                OverflowItem(R.string.menu_settings, { menu = false; onOpenFocoSettings() })
-                OverflowItem(R.string.menu_default, { menu = false; onChooseDefault() })
-                OverflowItem(R.string.menu_system, { menu = false; onOpenSystemSettings() })
+                OverflowItem(R.string.menu_add) { pending = onAddApps; menu = false }
+                OverflowItem(R.string.menu_edit) { pending = onEditApps; menu = false }
+                OverflowItem(R.string.menu_settings) { pending = onOpenFocoSettings; menu = false }
+                OverflowItem(R.string.menu_default) { pending = onChooseDefault; menu = false }
+                OverflowItem(R.string.menu_system) { pending = onOpenSystemSettings; menu = false }
                 if (showWorkRefresh) {
-                    OverflowItem(R.string.menu_refresh_work, { menu = false; onRefreshWork() })
+                    OverflowItem(R.string.menu_refresh_work) { pending = onRefreshWork; menu = false }
                 }
             }
         }
@@ -449,9 +461,11 @@ private fun NotDefaultBanner(onChooseDefault: () -> Unit) {
 }
 
 @Composable
-private fun NlsOffBanner(onOpenAvisos: () -> Unit) {
+private fun NlsOffBanner(disconnected: Boolean, onOpenAvisos: () -> Unit) {
     BannerRow(
-        message = stringResource(R.string.nls_banner),
+        message = stringResource(
+            if (disconnected) R.string.nls_banner_disconnected else R.string.nls_banner,
+        ),
         action = stringResource(R.string.nls_banner_cta),
         onAction = onOpenAvisos,
     )

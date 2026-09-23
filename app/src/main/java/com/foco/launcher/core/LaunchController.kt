@@ -5,8 +5,8 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
 import android.provider.Settings
+import android.net.Uri
 import com.foco.launcher.registry.PackageRegistry
-import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkApp
 import com.foco.launcher.work.WorkSettingsLink
@@ -35,12 +35,21 @@ object LaunchController {
         }
     }
 
+    /**
+     * Anti-brick escape. Always the system settings list.
+     * A package launch intent can land on a shell that is not that list.
+     */
     fun openSystemSettings(context: Context): Boolean {
         val intent = Intent(Settings.ACTION_SETTINGS).addCategory(Intent.CATEGORY_DEFAULT)
-        if (ResolvedStart.start(context, intent)) return true
-        val pkg = SuggestedApps.settingsPackage(context) ?: return false
-        val launch = context.packageManager.getLaunchIntentForPackage(pkg) ?: return false
-        return ResolvedStart.start(context, launch)
+        return ResolvedStart.start(context, intent)
+    }
+
+    /** App info, where Android 13+ hides "Permitir ajustes restringidos" for a sideload. */
+    fun openAppDetails(context: Context): Boolean {
+        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .addCategory(Intent.CATEGORY_DEFAULT)
+            .setData(Uri.fromParts("package", context.packageName, null))
+        return ResolvedStart.start(context, intent)
     }
 
     /** Clock app if one resolves. No-op when the device has none. No weather. */
