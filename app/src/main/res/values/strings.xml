@@ -25,6 +25,11 @@
     <string name="banner_not_default">Foco no es el inicio del teléfono.</string>
     <string name="banner_choose">Elegir</string>
 
+    <string name="section_personal">Personal</string>
+    <string name="section_work">Trabajo</string>
+    <string name="work_sub">Se abren en el perfil de trabajo. Foco no las filtra.</string>
+    <string name="work_empty">No hay apps de trabajo para mostrar.</string>
+
     <string name="home_empty">Todavía no hay apps en tu lista.</string>
     <string name="home_empty_hint">Agregá las que querés ver.</string>
     <string name="home_loading">Cargando</string>

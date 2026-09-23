@@ -9,6 +9,8 @@ import com.foco.launcher.FocoApp
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
+import com.foco.launcher.work.WorkApp
+import com.foco.launcher.work.WorkCatalogRules
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,6 +25,8 @@ data class HomeUiState(
     val apps: List<LaunchableApp> = emptyList(),
     val message: String? = null,
     val banner: HomeBanner = HomeBanner.None,
+    val workProfile: Boolean = false,
+    val workApps: List<WorkApp> = emptyList(),
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -66,6 +70,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                         ),
                     )
                 }
+            }.combine(app.workCatalog.state) { ui, work ->
+                val showWork = work.loaded && WorkCatalogRules.showSection(work.hasWorkProfile)
+                ui.copy(
+                    workProfile = showWork,
+                    workApps = if (showWork) work.apps else emptyList(),
+                )
             }.collect { _state.value = it }
         }
     }
@@ -73,6 +83,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun onResume() {
         resumeTick.value += 1
         app.registry.refreshIfPackagesChanged()
+        app.workCatalog.refresh()
     }
 
     fun showOpenFail() {

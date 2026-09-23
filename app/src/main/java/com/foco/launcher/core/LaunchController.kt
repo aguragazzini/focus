@@ -2,9 +2,11 @@ package com.foco.launcher.core
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.provider.Settings
 import com.foco.launcher.registry.PackageRegistry
 import com.foco.launcher.security.BiometricGate
+import com.foco.launcher.work.WorkApp
 
 /**
  * Unique protected launch path: taps from Foco home.
@@ -17,6 +19,17 @@ object LaunchController {
         }
         val intent = registry.resolveLaunchIntent(packageName) ?: return false
         return startSafely(context, intent)
+    }
+
+    /** Work-profile launch. No Foco biometric gate. */
+    fun openWorkApp(context: Context, app: WorkApp): Boolean {
+        val launcherApps = context.getSystemService(LauncherApps::class.java) ?: return false
+        return try {
+            launcherApps.startMainActivity(app.component, app.user, null, null)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     fun openSystemSettings(context: Context): Boolean {

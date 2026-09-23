@@ -16,6 +16,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.foco.launcher.FocoApp
 import com.foco.launcher.settings.SettingsActivity
 import com.foco.launcher.settings.SetupActivity
+import com.foco.launcher.work.WorkApp
 
 class LauncherActivity : ComponentActivity() {
     private lateinit var vm: HomeViewModel
@@ -49,6 +50,11 @@ class LauncherActivity : ComponentActivity() {
                     state = state,
                     onLaunch = { pkg ->
                         if (!LaunchController.openApp(this, app.registry, pkg)) {
+                            vm.showOpenFail()
+                        }
+                    },
+                    onLaunchWork = { workApp: WorkApp ->
+                        if (!LaunchController.openWorkApp(this, workApp)) {
                             vm.showOpenFail()
                         }
                     },
