@@ -7,6 +7,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.foco.launcher.FocoApp
 import com.foco.launcher.R
+import com.foco.launcher.notification.FocoNotificationListener
+import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
@@ -32,6 +34,7 @@ data class HomeUiState(
     val apps: List<LaunchableApp> = emptyList(),
     val message: String? = null,
     val banner: HomeBanner = HomeBanner.None,
+    val nlsAttention: NlsRecovery.Attention = NlsRecovery.Attention.None,
     val filterActive: Boolean = false,
     val workPresence: WorkPresence = WorkPresence.Unknown,
     val workKind: WorkSectionKind = WorkSectionKind.Hidden,
@@ -70,9 +73,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }.combine(workLinkResolved) { pair, link ->
                 pair to link
             }.combine(app.workCatalog.state) { packed, work ->
+                packed to work
+            }.combine(FocoNotificationListener.connected) { packedWork, connected ->
+                val (packed, work) = packedWork
                 val (pair, link) = packed
                 val (snap, msg) = pair
-                buildUi(snap, msg, link, work)
+                buildUi(snap, msg, link, work, connected)
             }.combine(app.workCatalog.icons) { ui, icons ->
                 ui.copy(workIcons = icons)
             }.combine(app.workCatalog.iconEpoch) { ui, epoch ->
@@ -84,6 +90,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun onResume() {
         resumeTick.value += 1
         refreshDeviceFacts()
+        NlsStatus.requestRebind(getApplication())
         app.registry.refreshIfPackagesChanged()
         app.workCatalog.refresh()
     }
@@ -133,12 +140,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         msg: String?,
         linkResolved: Boolean,
         work: WorkHomeState,
+        listenerConnected: Boolean,
     ): HomeUiState {
         if (!snap.startupReady) {
             return HomeUiState(message = msg)
         }
         val isDefault = LaunchController.isDefaultHome(getApplication())
-        val nlsNeedsGrant = snap.prefs.nlsFilterEnabled && !NlsStatus.isGranted(getApplication())
+        val granted = NlsStatus.isGranted(getApplication())
+        val attention = NlsRecovery.attention(
+            granted = granted,
+            filterEnabled = snap.prefs.nlsFilterEnabled,
+            connected = listenerConnected,
+        )
         val kind = if (!work.loaded) {
             WorkSectionKind.Hidden
         } else {
@@ -160,9 +173,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             banner = selectHomeBanner(
                 setupDone = snap.prefs.setupDone,
                 isDefaultHome = isDefault,
-                nlsNeedsGrant = nlsNeedsGrant,
+                nlsNeedsGrant = attention != NlsRecovery.Attention.None,
             ),
-            filterActive = NlsStatus.isFilterActive(getApplication(), snap.prefs.nlsFilterEnabled),
+            nlsAttention = attention,
+            filterActive = NlsStatus.isFilterActive(
+                getApplication(),
+                snap.prefs.nlsFilterEnabled,
+                listenerConnected,
+            ),
             workPresence = LaunchpadRules.workPresence(
                 loaded = work.loaded,
                 hasWorkProfile = work.hasWorkProfile,

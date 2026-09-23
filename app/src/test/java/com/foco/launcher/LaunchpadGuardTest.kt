@@ -42,4 +42,24 @@ class LaunchpadGuardTest {
         assertTrue(src.contains("lp_remove"))
         assertTrue(src.contains("lp_open"))
     }
+
+    @Test
+    fun homeIsClockThenPersonalThenWorkWithoutStripChrome() {
+        val src = File("src/main/java/com/foco/launcher/core/HomeScreen.kt").readText()
+        val clock = src.indexOf("HomeClock")
+        val personal = src.indexOf("section_personal")
+        val work = src.indexOf("section_work")
+        assertTrue(clock >= 0 && personal > clock && work > personal)
+        assertFalse(src.contains("StatusStrip"))
+        assertFalse(src.contains("work_sub"))
+        assertFalse(src.contains("personal_edit"))
+        assertFalse(src.contains("Icons.Outlined.Refresh"))
+        assertFalse(src.contains("AppWidgetHost"))
+        assertTrue(src.contains("home_empty"))
+        assertTrue(src.contains("home_add"))
+        val clockSrc = File("src/main/java/com/foco/launcher/core/HomeClockFormat.kt").readText()
+        assertFalse(clockSrc.contains("http"))
+        assertFalse(clockSrc.contains("weather"))
+        assertFalse(clockSrc.contains("AppWidgetHost"))
+    }
 }

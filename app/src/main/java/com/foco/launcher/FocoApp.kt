@@ -1,6 +1,8 @@
 package com.foco.launcher
 
 import android.app.Application
+import com.foco.launcher.notification.FocoNotificationListener
+import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.NotificationAllowlistStore
 import com.foco.launcher.notification.NotificationPolicyEngine
 import com.foco.launcher.registry.PackageRegistry
@@ -46,6 +48,9 @@ class FocoApp : Application() {
             } finally {
                 _startupReady.value = true
             }
+            // Update sideload keeps the grant and drops the bind. Rebind, then scrub.
+            NlsStatus.requestRebind(this@FocoApp)
+            FocoNotificationListener.scrubIfConnected()
         }
     }
 }

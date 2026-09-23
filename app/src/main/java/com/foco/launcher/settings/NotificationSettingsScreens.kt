@@ -49,7 +49,10 @@ import com.foco.launcher.core.FocoTextButton
 
 @Composable
 fun NlsOnboardingScreen(
+    showReturnedUngranted: Boolean,
+    failMessage: String?,
     onOpenSettings: () -> Unit,
+    onOpenAppInfo: () -> Unit,
     onSkip: () -> Unit,
 ) {
     Column(
@@ -73,26 +76,63 @@ fun NlsOnboardingScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Start,
         )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.nls_how),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Start,
-        )
-        Spacer(Modifier.height(32.dp))
+        Spacer(Modifier.height(16.dp))
+        NlsGrantSteps(showReturnedUngranted = showReturnedUngranted)
+        if (!failMessage.isNullOrBlank()) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = failMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Start,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = stringResource(R.string.nls_moto_hint),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Start,
+            )
+        }
+        Spacer(Modifier.height(24.dp))
         FocoPrimaryButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.nls_cta))
         }
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.nls_moto_hint),
-            style = MaterialTheme.typography.bodyMedium,
-            textAlign = TextAlign.Start,
-        )
+        FocoTextButton(onClick = onOpenAppInfo, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.nls_open_app_info))
+        }
         Spacer(Modifier.height(8.dp))
         FocoTextButton(onClick = onSkip) {
             Text(stringResource(R.string.nls_skip))
         }
+    }
+}
+
+@Composable
+private fun NlsGrantSteps(showReturnedUngranted: Boolean) {
+    Text(
+        text = stringResource(R.string.nls_step_restricted),
+        style = MaterialTheme.typography.bodyMedium,
+        textAlign = TextAlign.Start,
+    )
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = stringResource(R.string.nls_step_access),
+        style = MaterialTheme.typography.bodyMedium,
+        textAlign = TextAlign.Start,
+    )
+    Spacer(Modifier.height(8.dp))
+    Text(
+        text = stringResource(R.string.nls_step_toggle),
+        style = MaterialTheme.typography.bodyMedium,
+        textAlign = TextAlign.Start,
+    )
+    if (showReturnedUngranted) {
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = stringResource(R.string.nls_restricted_back),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Start,
+        )
     }
 }
 
@@ -103,6 +143,7 @@ fun AvisosScreen(
     onBack: () -> Unit,
     onToggleFilter: (Boolean) -> Unit,
     onOpenNlsSettings: () -> Unit,
+    onOpenAppInfo: () -> Unit,
     onSetNotifAllowed: (String, Boolean) -> Unit,
     onNlsMessageShown: () -> Unit,
 ) {
@@ -160,9 +201,21 @@ fun AvisosScreen(
                         onCheckedChange = onToggleFilter,
                     )
                 }
-                if (state.nlsFilterEnabled && !state.nlsGranted) {
+                if (state.nlsActive) {
+                    Text(
+                        text = stringResource(R.string.nls_filter_status_active),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                } else if (state.nlsFilterEnabled && !state.nlsGranted) {
                     Text(
                         text = stringResource(R.string.nls_inactive),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                } else if (state.nlsFilterEnabled && state.nlsGranted && !state.nlsConnected) {
+                    Text(
+                        text = stringResource(R.string.nls_disconnected),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
@@ -189,26 +242,39 @@ fun AvisosScreen(
                     }
                 }
             }
-            if (state.nlsFilterEnabled && !state.nlsGranted) {
+            if (!state.nlsGranted || (state.nlsFilterEnabled && !state.nlsConnected)) {
                 item {
-                    Text(
-                        text = stringResource(R.string.nls_missing_permission),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    )
-                    FocoPrimaryButton(
-                        onClick = onOpenNlsSettings,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp),
-                    ) {
-                        Text(stringResource(R.string.nls_cta))
+                    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                        if (!state.nlsGranted) {
+                            Text(
+                                text = stringResource(R.string.nls_missing_permission),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            NlsGrantSteps(showReturnedUngranted = state.nlsShowRestrictedReturn)
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        FocoPrimaryButton(
+                            onClick = onOpenNlsSettings,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(stringResource(R.string.nls_cta))
+                        }
+                        if (!state.nlsGranted) {
+                            Spacer(Modifier.height(8.dp))
+                            FocoTextButton(
+                                onClick = onOpenAppInfo,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text(stringResource(R.string.nls_open_app_info))
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = stringResource(R.string.nls_moto_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
                     }
-                    Text(
-                        text = stringResource(R.string.nls_moto_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                    )
                 }
             }
             if (state.nlsActive) {

@@ -25,10 +25,11 @@ object UserProfileHelper {
      * Extra UserHandles are treated as work-like; we never expose toggles for them.
      */
     fun hasWorkProfile(context: Context): Boolean {
-        val um = context.getSystemService(UserManager::class.java) ?: return false
-        val my = Process.myUserHandle()
-        val profiles = um.userProfiles
-        if (profiles.size <= 1) return false
-        return profiles.any { it != my }
+        return runCatching {
+            val um = context.getSystemService(UserManager::class.java) ?: return@runCatching false
+            val my = Process.myUserHandle()
+            val profiles = um.userProfiles
+            profiles.size > 1 && profiles.any { it != my }
+        }.getOrDefault(false)
     }
 }
