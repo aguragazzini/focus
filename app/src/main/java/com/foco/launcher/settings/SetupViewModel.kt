@@ -10,6 +10,7 @@ import com.foco.launcher.registry.SuggestedApp
 import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.registry.SuggestedKind
 import com.foco.launcher.registry.WhitelistMutations
+import com.foco.launcher.registry.withEntries
 import com.foco.launcher.registry.WhitelistSelection
 import com.foco.launcher.security.BiometricGate
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,7 +79,7 @@ class SetupViewModel(application: Application) : AndroidViewModel(application) {
                 pkg to BiometricGate.defaultBioEnabled(isPhone)
             }
             app.prefsStore.update { prefs ->
-                prefs.copy(entries = WhitelistMutations.addAll(emptyList(), packages))
+                prefs.withEntries(WhitelistMutations.addAll(emptyList(), packages))
             }
             _state.update {
                 it.copy(

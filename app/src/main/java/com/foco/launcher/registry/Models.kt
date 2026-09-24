@@ -16,6 +16,8 @@ data class LauncherPrefs(
     val biometricGlobalEnabled: Boolean = false,
     val entries: List<WhitelistEntry> = emptyList(),
     val nlsFilterEnabled: Boolean = false,
+    /** Home folders. Absent on v0.5.1 documents; decode falls back to empty. */
+    val groups: List<AppGroup> = emptyList(),
 ) {
     /** Andrés: personal packages that may notify. Derived from home + allowNotif. */
     val notificationAllowlist: Set<String>

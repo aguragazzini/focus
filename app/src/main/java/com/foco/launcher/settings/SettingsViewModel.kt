@@ -15,6 +15,7 @@ import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.registry.WhitelistMutations
+import com.foco.launcher.registry.withEntries
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkCatalogRules
 import com.foco.launcher.work.snapshot
@@ -255,7 +256,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     val isPhone = SuggestedApps.isPhone(getApplication(), pkg)
                     pkg to BiometricGate.defaultBioEnabled(isPhone)
                 }
-                prefs.copy(entries = WhitelistMutations.addAll(prefs.entries, packages))
+                prefs.withEntries(WhitelistMutations.addAll(prefs.entries, packages))
             }
             pendingAdd.value = emptySet()
             dest.value = SettingsDest.Edit
@@ -274,7 +275,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val target = removeCandidate.value ?: return
         viewModelScope.launch {
             app.prefsStore.update { prefs ->
-                prefs.copy(entries = WhitelistMutations.remove(prefs.entries, target.packageName))
+                prefs.withEntries(WhitelistMutations.remove(prefs.entries, target.packageName))
             }
             removeCandidate.value = null
         }
@@ -287,7 +288,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 val index = ordered.indexOfFirst { it.packageName == packageName }
                 if (index < 0) return@update prefs
                 val to = (index + delta).coerceIn(0, ordered.lastIndex)
-                prefs.copy(entries = WhitelistMutations.move(ordered, index, to))
+                prefs.withEntries(WhitelistMutations.move(ordered, index, to))
             }
         }
     }

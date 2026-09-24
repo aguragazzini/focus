@@ -33,12 +33,15 @@ class PrefsStore(context: Context) {
             val current = store[KEY_JSON]?.let {
                 runCatching { json.decodeFromString<LauncherPrefs>(it) }.getOrNull()
             } ?: LauncherPrefs()
-            store[KEY_JSON] = json.encodeToString(transform(current))
+            val encoded = json.encodeToString(transform(current))
+            if (store[KEY_JSON] != encoded) {
+                store[KEY_JSON] = encoded
+            }
         }
     }
 
     suspend fun setEntries(entries: List<WhitelistEntry>) {
-        update { it.copy(entries = entries) }
+        update { it.withEntries(entries) }
     }
 
     suspend fun setSetupDone(done: Boolean = true) {

@@ -10,9 +10,13 @@ import com.foco.launcher.R
 import com.foco.launcher.notification.FocoNotificationListener
 import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.notification.NlsStatus
+import com.foco.launcher.registry.AppGroup
+import com.foco.launcher.registry.GroupMutations
+import com.foco.launcher.registry.GroupSection
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.WhitelistMutations
+import com.foco.launcher.registry.withEntries
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkApp
 import com.foco.launcher.work.WorkCatalogRules
@@ -25,6 +29,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 data class HomeUiState(
     val prefsReady: Boolean = false,
@@ -32,6 +37,7 @@ data class HomeUiState(
     val setupDone: Boolean = false,
     val isDefaultHome: Boolean = false,
     val apps: List<LaunchableApp> = emptyList(),
+    val groups: List<AppGroup> = emptyList(),
     val message: String? = null,
     val banner: HomeBanner = HomeBanner.None,
     val nlsAttention: NlsRecovery.Attention = NlsRecovery.Attention.None,
@@ -120,8 +126,76 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     fun removePersonal(packageName: String) {
         viewModelScope.launch {
             app.prefsStore.update { prefs ->
-                prefs.copy(entries = WhitelistMutations.remove(prefs.entries, packageName))
+                prefs.withEntries(WhitelistMutations.remove(prefs.entries, packageName))
             }
+        }
+    }
+
+    fun createGroup(section: GroupSection, rawName: String, memberId: String) {
+        val id = UUID.randomUUID().toString()
+        val workAllowed = workMemberIds()
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val allowed = allowedIds(prefs, section, workAllowed)
+                val next = GroupMutations.create(prefs.groups, section, rawName, memberId, id, allowed)
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    fun addToGroup(groupId: String, memberId: String) {
+        val workAllowed = workMemberIds()
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val section = prefs.groups.find { it.id == groupId }?.section ?: return@update prefs
+                val allowed = allowedIds(prefs, section, workAllowed)
+                val next = GroupMutations.addMember(prefs.groups, groupId, memberId, allowed)
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    fun renameGroup(groupId: String, rawName: String) {
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val next = GroupMutations.rename(prefs.groups, groupId, rawName)
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    fun removeFromGroup(groupId: String, memberId: String) {
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val next = GroupMutations.removeMember(prefs.groups, groupId, memberId)
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    fun deleteGroup(groupId: String) {
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val next = GroupMutations.delete(prefs.groups, groupId)
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    private fun workMemberIds(): Set<String> {
+        val work = app.workCatalog.state.value
+        if (!work.loaded || work.loadFailed || !work.hasWorkProfile) return emptySet()
+        return work.apps.map { it.key }.toSet()
+    }
+
+    private fun allowedIds(
+        prefs: LauncherPrefs,
+        section: GroupSection,
+        workAllowed: Set<String>,
+    ): Set<String> {
+        return when (section) {
+            GroupSection.PERSONAL -> prefs.entries.map { it.packageName }.toSet()
+            GroupSection.WORK -> workAllowed
         }
     }
 
@@ -169,6 +243,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             setupDone = snap.prefs.setupDone,
             isDefaultHome = isDefault,
             apps = visible(snap.prefs, snap.apps),
+            groups = snap.prefs.groups,
             message = msg,
             banner = selectHomeBanner(
                 setupDone = snap.prefs.setupDone,
