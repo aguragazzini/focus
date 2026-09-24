@@ -5,6 +5,8 @@ import com.foco.launcher.notification.FocoNotificationListener
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.NotificationAllowlistStore
 import com.foco.launcher.notification.NotificationPolicyEngine
+import com.foco.launcher.registry.GroupMutations
+import com.foco.launcher.registry.GroupSection
 import com.foco.launcher.registry.PackageRegistry
 import com.foco.launcher.registry.PrefsStore
 import com.foco.launcher.work.WorkCatalog
@@ -51,6 +53,16 @@ class FocoApp : Application() {
             // Update sideload keeps the grant and drops the bind. Rebind, then scrub.
             NlsStatus.requestRebind(this@FocoApp)
             FocoNotificationListener.scrubIfConnected()
+        }
+        applicationScope.launch {
+            workCatalog.state.collect { work ->
+                if (!work.loaded || work.loadFailed) return@collect
+                val live = if (work.hasWorkProfile) work.apps.map { it.key }.toSet() else emptySet()
+                prefsStore.update { prefs ->
+                    val next = GroupMutations.retain(prefs.groups, GroupSection.WORK, live)
+                    if (next == prefs.groups) prefs else prefs.copy(groups = next)
+                }
+            }
         }
     }
 }

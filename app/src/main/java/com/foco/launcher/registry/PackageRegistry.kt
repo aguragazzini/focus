@@ -140,7 +140,7 @@ class PackageRegistry(
                 if (!replacing) {
                     scope.launch {
                         prefsStore.update { prefs ->
-                            prefs.copy(entries = WhitelistMutations.remove(prefs.entries, packageName))
+                            prefs.withEntries(WhitelistMutations.remove(prefs.entries, packageName))
                         }
                     }
                 }

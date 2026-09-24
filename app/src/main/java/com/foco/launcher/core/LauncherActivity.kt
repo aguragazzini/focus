@@ -85,6 +85,11 @@ class LauncherActivity : ComponentActivity() {
                     },
                     onRefreshWork = vm::refreshWork,
                     onRemovePersonal = vm::removePersonal,
+                    onCreateGroup = vm::createGroup,
+                    onAddToGroup = vm::addToGroup,
+                    onRenameGroup = vm::renameGroup,
+                    onRemoveFromGroup = vm::removeFromGroup,
+                    onDeleteGroup = vm::deleteGroup,
                     onEnsureWorkIcon = vm::ensureWorkIcon,
                     onOpenWorkSettings = {
                         LaunchController.openWorkProfileSettings(this)

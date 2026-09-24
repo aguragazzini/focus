@@ -62,6 +62,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -70,6 +72,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import com.foco.launcher.R
 import com.foco.launcher.notification.NlsRecovery
+import com.foco.launcher.registry.AppGroup
+import com.foco.launcher.registry.ArrangedSection
+import com.foco.launcher.registry.GroupLayout
+import com.foco.launcher.registry.GroupMutations
+import com.foco.launcher.registry.GroupSection
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.work.WorkApp
@@ -114,6 +121,11 @@ fun HomeScreen(
     onOpenCalendar: () -> Unit,
     onRefreshWork: () -> Unit,
     onRemovePersonal: (String) -> Unit,
+    onCreateGroup: (GroupSection, String, String) -> Unit,
+    onAddToGroup: (String, String) -> Unit,
+    onRenameGroup: (String, String) -> Unit,
+    onRemoveFromGroup: (String, String) -> Unit,
+    onDeleteGroup: (String) -> Unit,
     onEnsureWorkIcon: (String) -> Unit,
     onOpenWorkSettings: () -> Unit,
     onQuietTap: () -> Unit,
@@ -121,9 +133,31 @@ fun HomeScreen(
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var sheetApp by remember { mutableStateOf<LaunchableApp?>(null) }
+    var sheet by remember { mutableStateOf<HomeSheet?>(null) }
     var confirmApp by remember { mutableStateOf<LaunchableApp?>(null) }
+    var naming by remember { mutableStateOf<GroupNameRequest?>(null) }
+    var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     var workQuery by rememberSaveable { mutableStateOf("") }
+
+    val personalArranged = remember(state.groups, state.apps) {
+        GroupLayout.arrange(GroupSection.PERSONAL, state.groups, state.apps.map { it.packageName })
+    }
+    val workArranged = remember(state.groups, state.workApps) {
+        GroupLayout.arrange(GroupSection.WORK, state.groups, state.workApps.map { it.key })
+    }
+    val openSheet = sheet
+    LaunchedEffect(openSheet, state.groups, state.apps, state.workApps) {
+        val open = openSheet as? HomeSheet.Open ?: return@LaunchedEffect
+        val group = state.groups.find { it.id == open.groupId }
+        val live = when (group?.section) {
+            GroupSection.PERSONAL -> state.apps.map { it.packageName }.toSet()
+            GroupSection.WORK -> state.workApps.map { it.key }.toSet()
+            null -> emptySet()
+        }
+        if (group == null || group.members.none { it in live }) {
+            sheet = null
+        }
+    }
 
     LaunchedEffect(state.message) {
         val msg = state.message ?: return@LaunchedEffect
@@ -199,7 +233,7 @@ fun HomeScreen(
                     )
                     Spacer(Modifier.height(12.dp))
                 }
-                if (state.apps.isEmpty()) {
+                if (personalArranged.groups.isEmpty() && personalArranged.looseIds.isEmpty()) {
                     item(key = "personal-empty") {
                         PersonalEmptyInline(
                             onAddApps = onAddApps,
@@ -207,18 +241,36 @@ fun HomeScreen(
                         )
                     }
                 } else {
-                    val rows = state.apps.map { it.toCell() }.chunked(4)
+                    val personalByPkg = state.apps.associateBy { it.packageName }
+                    val rows = sectionCells(
+                        arranged = personalArranged,
+                        loose = { id -> personalByPkg[id]?.toCell() },
+                        folder = { group ->
+                            val members = group.members.mapNotNull { personalByPkg[it] }
+                            group.toCell(members.map { it.icon })
+                        },
+                    ).chunked(4)
                     items(
                         items = rows,
-                        key = { row -> "p:" + row.joinToString("|") { it.id } },
+                        key = { row -> "p:" + row.joinToString("|") { it.key } },
                     ) { row ->
                         AppRow(
                             cells = row,
                             iconEpoch = 0L,
                             modifier = Modifier.padding(horizontal = 24.dp),
-                            onClick = { cell -> onLaunch(cell.id) },
+                            onClick = { cell ->
+                                if (cell.groupId != null) {
+                                    sheet = HomeSheet.Open(cell.groupId)
+                                } else {
+                                    onLaunch(cell.id)
+                                }
+                            },
                             onLongClick = { cell ->
-                                state.apps.firstOrNull { it.packageName == cell.id }?.let { sheetApp = it }
+                                if (cell.groupId != null) {
+                                    sheet = HomeSheet.Open(cell.groupId)
+                                } else {
+                                    personalByPkg[cell.id]?.let { sheet = HomeSheet.Personal(it) }
+                                }
                             },
                             onEnsureIcon = null,
                         )
@@ -279,29 +331,67 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        WorkCatalogRules.showWorkGrid(state.workKind, workVisible.size) -> {
+                        WorkCatalogRules.showWorkGrid(
+                            state.workKind,
+                            if (searchOpen && workQuery.isNotBlank()) {
+                                workVisible.size
+                            } else {
+                                workArranged.groups.size + workArranged.looseIds.size
+                            },
+                        ) -> {
                             val byKey = state.workApps.associateBy { it.key }
                             val muted = state.workKind == WorkSectionKind.Quiet
-                            val rows = workVisible.map { app ->
-                                app.toCell(state.workIcons[app.key], muted)
-                            }.chunked(4)
+                            val searching = searchOpen && workQuery.isNotBlank()
+                            val cells = if (searching) {
+                                workVisible.map { app -> app.toCell(state.workIcons[app.key], muted) }
+                            } else {
+                                sectionCells(
+                                    arranged = workArranged,
+                                    loose = { id ->
+                                        byKey[id]?.toCell(state.workIcons[id], muted)
+                                    },
+                                    folder = { group ->
+                                        val icons = group.members.map { state.workIcons[it] }
+                                        group.toCell(icons, muted)
+                                    },
+                                )
+                            }
+                            val rows = cells.chunked(4)
                             items(
                                 items = rows,
-                                key = { row -> "w:" + row.joinToString("|") { it.id } },
+                                key = { row -> "w:" + row.joinToString("|") { it.key } },
                             ) { row ->
                                 AppRow(
                                     cells = row,
                                     iconEpoch = state.workIconEpoch,
                                     modifier = Modifier.padding(horizontal = 24.dp),
                                     onClick = { cell ->
-                                        if (muted) {
+                                        if (cell.groupId != null) {
+                                            sheet = HomeSheet.Open(cell.groupId)
+                                        } else if (muted) {
                                             onQuietTap()
                                         } else {
                                             byKey[cell.id]?.let(onLaunchWork)
                                         }
                                     },
-                                    onLongClick = null,
-                                    onEnsureIcon = { cell -> onEnsureWorkIcon(cell.id) },
+                                    onLongClick = { cell ->
+                                        if (cell.groupId != null) {
+                                            sheet = HomeSheet.Open(cell.groupId)
+                                        } else {
+                                            byKey[cell.id]?.let { sheet = HomeSheet.Work(it) }
+                                        }
+                                    },
+                                    onEnsureIcon = { cell ->
+                                        if (cell.groupId != null) {
+                                            workArranged.groups
+                                                .find { it.id == cell.groupId }
+                                                ?.members
+                                                ?.take(4)
+                                                ?.forEach(onEnsureWorkIcon)
+                                        } else {
+                                            onEnsureWorkIcon(cell.id)
+                                        }
+                                    },
                                 )
                             }
                         }
@@ -318,32 +408,34 @@ fun HomeScreen(
             }
         }
 
-    val pressed = sheetApp
-    if (pressed != null) {
+    val activeSheet = sheet
+    if (activeSheet != null) {
         ModalBottomSheet(
-            onDismissRequest = { sheetApp = null },
+            onDismissRequest = { sheet = null },
             containerColor = FocoInkElevated,
             contentColor = FocoPaper,
             tonalElevation = 0.dp,
             dragHandle = { BottomSheetDefaults.DragHandle(color = FocoPaperDim) },
             shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 12.dp),
-            ) {
-                Text(
-                    text = pressed.label,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = FocoPaper,
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-                )
-                SheetAction(
-                    label = stringResource(R.string.lp_remove),
-                    onClick = {
-                        val target = pressed
-                        sheetApp = null
+            when (activeSheet) {
+                is HomeSheet.Personal -> PersonalAppSheet(
+                    app = activeSheet.app,
+                    onOpen = {
+                        val pkg = activeSheet.app.packageName
+                        sheet = null
+                        onLaunch(pkg)
+                    },
+                    onAddToGroup = {
+                        sheet = HomeSheet.Pick(
+                            section = GroupSection.PERSONAL,
+                            memberId = activeSheet.app.packageName,
+                            label = activeSheet.app.label,
+                        )
+                    },
+                    onRemove = {
+                        val target = activeSheet.app
+                        sheet = null
                         val settingsPkg = SuggestedApps.settingsPackage(context)
                         if (LaunchpadRules.needsSettingsConfirm(target.packageName, settingsPkg)) {
                             confirmApp = target
@@ -352,16 +444,127 @@ fun HomeScreen(
                         }
                     },
                 )
-                SheetAction(
-                    label = stringResource(R.string.lp_open),
-                    onClick = {
-                        val pkg = pressed.packageName
-                        sheetApp = null
-                        onLaunch(pkg)
+                is HomeSheet.Work -> WorkAppSheet(
+                    app = activeSheet.app,
+                    onOpen = {
+                        val target = activeSheet.app
+                        sheet = null
+                        if (state.workKind == WorkSectionKind.Quiet) onQuietTap() else onLaunchWork(target)
+                    },
+                    onAddToGroup = {
+                        sheet = HomeSheet.Pick(
+                            section = GroupSection.WORK,
+                            memberId = activeSheet.app.key,
+                            label = activeSheet.app.label,
+                        )
                     },
                 )
+                is HomeSheet.Pick -> GroupPickSheet(
+                    label = activeSheet.label,
+                    groups = state.groups
+                        .filter { it.section == activeSheet.section }
+                        .sortedBy { it.order },
+                    onPick = { groupId ->
+                        val memberId = activeSheet.memberId
+                        sheet = null
+                        onAddToGroup(groupId, memberId)
+                    },
+                    onCreate = {
+                        naming = GroupNameRequest(
+                            section = activeSheet.section,
+                            memberId = activeSheet.memberId,
+                            groupId = null,
+                            initial = "",
+                        )
+                        sheet = null
+                    },
+                )
+                is HomeSheet.Open -> {
+                    val group = state.groups.find { it.id == activeSheet.groupId }
+                    if (group != null) {
+                        if (group.section == GroupSection.WORK) {
+                            LaunchedEffect(group.id, group.members) {
+                                group.members.forEach(onEnsureWorkIcon)
+                            }
+                        }
+                        OpenGroupSheet(
+                            group = group,
+                            personalApps = state.apps,
+                            workApps = state.workApps,
+                            workIcons = state.workIcons,
+                            workMuted = state.workKind == WorkSectionKind.Quiet,
+                            onLaunchPersonal = { pkg ->
+                                sheet = null
+                                onLaunch(pkg)
+                            },
+                            onLaunchWork = { app ->
+                                sheet = null
+                                if (state.workKind == WorkSectionKind.Quiet) onQuietTap() else onLaunchWork(app)
+                            },
+                            onRemoveMember = { memberId ->
+                                onRemoveFromGroup(group.id, memberId)
+                            },
+                            onRename = {
+                                naming = GroupNameRequest(
+                                    section = group.section,
+                                    memberId = null,
+                                    groupId = group.id,
+                                    initial = group.name,
+                                )
+                            },
+                            onDelete = { confirmDeleteId = group.id },
+                        )
+                    }
+                }
             }
         }
+    }
+
+    val nameRequest = naming
+    if (nameRequest != null) {
+        GroupNameDialog(
+            create = nameRequest.groupId == null,
+            initial = nameRequest.initial,
+            onDismiss = { naming = null },
+            onConfirm = { raw ->
+                val request = nameRequest
+                naming = null
+                if (request.groupId != null) {
+                    onRenameGroup(request.groupId, raw)
+                } else if (request.memberId != null) {
+                    onCreateGroup(request.section, raw, request.memberId)
+                }
+            },
+        )
+    }
+
+    val deleteId = confirmDeleteId
+    if (deleteId != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDeleteId = null },
+            containerColor = MaterialTheme.colorScheme.surface,
+            tonalElevation = 0.dp,
+            text = {
+                Text(
+                    text = stringResource(R.string.group_delete_body),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            },
+            confirmButton = {
+                FocoTextButton(
+                    onClick = {
+                        onDeleteGroup(deleteId)
+                        confirmDeleteId = null
+                        sheet = null
+                    },
+                ) { Text(stringResource(R.string.group_delete)) }
+            },
+            dismissButton = {
+                FocoTextButton(onClick = { confirmDeleteId = null }) {
+                    Text(stringResource(R.string.group_cancel))
+                }
+            },
+        )
     }
 
     val pendingConfirm = confirmApp
@@ -603,13 +806,40 @@ private fun SheetAction(label: String, onClick: () -> Unit) {
 private data class HomeCell(
     val id: String,
     val label: String,
-    val icon: Bitmap?,
+    val icon: Bitmap? = null,
     val muted: Boolean = false,
-)
+    val groupId: String? = null,
+    val folderIcons: List<Bitmap?> = emptyList(),
+) {
+    val key: String get() = if (groupId != null) "g:$groupId" else id
+}
 
 private fun LaunchableApp.toCell(): HomeCell = HomeCell(packageName, label, icon)
 
 private fun WorkApp.toCell(icon: Bitmap?, muted: Boolean): HomeCell = HomeCell(key, label, icon, muted)
+
+private fun AppGroup.toCell(icons: List<Bitmap?>, muted: Boolean = false): HomeCell {
+    return HomeCell(
+        id = id,
+        label = name,
+        muted = muted,
+        groupId = id,
+        folderIcons = icons.take(4),
+    )
+}
+
+private fun sectionCells(
+    arranged: ArrangedSection,
+    loose: (String) -> HomeCell?,
+    folder: (AppGroup) -> HomeCell,
+): List<HomeCell> {
+    val tiles = ArrayList<HomeCell>(arranged.groups.size + arranged.looseIds.size)
+    for (group in arranged.groups) tiles += folder(group)
+    for (id in arranged.looseIds) {
+        loose(id)?.let { tiles += it }
+    }
+    return tiles
+}
 
 @Composable
 private fun AppRow(
@@ -665,7 +895,13 @@ private fun AppCell(
             .padding(vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (image != null) {
+        if (cell.groupId != null) {
+            FolderIcon(
+                icons = cell.folderIcons,
+                description = stringResource(R.string.group_cd, cell.label),
+                alpha = iconAlpha,
+            )
+        } else if (image != null) {
             Image(
                 bitmap = image,
                 contentDescription = cell.label,
@@ -696,6 +932,297 @@ private fun AppCell(
         )
     }
 }
+
+@Composable
+private fun FolderIcon(icons: List<Bitmap?>, description: String, alpha: Float) {
+    val slots = List(4) { index -> icons.getOrNull(index) }
+    Box(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(FocoLine)
+            .alpha(alpha)
+            .padding(4.dp)
+            .semantics { contentDescription = description },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            for (row in slots.chunked(2)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                    for (icon in row) {
+                        MiniIcon(icon)
+                    }
+                    if (row.size == 1) {
+                        Spacer(Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniIcon(bitmap: Bitmap?) {
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier
+                .size(18.dp)
+                .clip(RoundedCornerShape(4.dp)),
+            contentScale = ContentScale.Fit,
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(FocoInk),
+        )
+    }
+}
+
+@Composable
+private fun PersonalAppSheet(
+    app: LaunchableApp,
+    onOpen: () -> Unit,
+    onAddToGroup: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+    ) {
+        SheetTitle(app.label)
+        SheetAction(stringResource(R.string.lp_open), onOpen)
+        SheetAction(stringResource(R.string.group_add), onAddToGroup)
+        SheetAction(stringResource(R.string.lp_remove), onRemove)
+    }
+}
+
+@Composable
+private fun WorkAppSheet(
+    app: WorkApp,
+    onOpen: () -> Unit,
+    onAddToGroup: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+    ) {
+        SheetTitle(app.label)
+        SheetAction(stringResource(R.string.lp_open), onOpen)
+        SheetAction(stringResource(R.string.group_add), onAddToGroup)
+    }
+}
+
+@Composable
+private fun GroupPickSheet(
+    label: String,
+    groups: List<AppGroup>,
+    onPick: (String) -> Unit,
+    onCreate: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+    ) {
+        SheetTitle(label)
+        for (group in groups) {
+            SheetAction(group.name) { onPick(group.id) }
+        }
+        SheetAction(stringResource(R.string.group_new), onCreate)
+    }
+}
+
+@Composable
+private fun OpenGroupSheet(
+    group: AppGroup,
+    personalApps: List<LaunchableApp>,
+    workApps: List<WorkApp>,
+    workIcons: Map<String, Bitmap>,
+    workMuted: Boolean,
+    onLaunchPersonal: (String) -> Unit,
+    onLaunchWork: (WorkApp) -> Unit,
+    onRemoveMember: (String) -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+    ) {
+        SheetTitle(group.name)
+        when (group.section) {
+            GroupSection.PERSONAL -> {
+                val byPkg = personalApps.associateBy { it.packageName }
+                for (member in group.members) {
+                    val app = byPkg[member] ?: continue
+                    MemberRow(
+                        label = app.label,
+                        icon = app.icon,
+                        onOpen = { onLaunchPersonal(app.packageName) },
+                        onRemove = { onRemoveMember(member) },
+                    )
+                }
+            }
+            GroupSection.WORK -> {
+                val byKey = workApps.associateBy { it.key }
+                for (member in group.members) {
+                    val app = byKey[member] ?: continue
+                    MemberRow(
+                        label = app.label,
+                        icon = workIcons[member],
+                        muted = workMuted,
+                        onOpen = { onLaunchWork(app) },
+                        onRemove = { onRemoveMember(member) },
+                    )
+                }
+            }
+        }
+        SheetAction(stringResource(R.string.group_rename), onRename)
+        SheetAction(stringResource(R.string.group_delete), onDelete)
+    }
+}
+
+@Composable
+private fun MemberRow(
+    label: String,
+    icon: Bitmap?,
+    muted: Boolean = false,
+    onOpen: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpen)
+            .padding(horizontal = 24.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val alpha = if (muted) 0.4f else 1f
+        if (icon != null) {
+            Image(
+                bitmap = icon.asImageBitmap(),
+                contentDescription = label,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .alpha(alpha),
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(FocoLine)
+                    .alpha(alpha),
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = FocoPaper,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 12.dp),
+        )
+        FocoTextButton(onClick = onRemove) {
+            Text(stringResource(R.string.group_remove))
+        }
+    }
+}
+
+@Composable
+private fun SheetTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyLarge,
+        color = FocoPaper,
+        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+private fun GroupNameDialog(
+    create: Boolean,
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var name by remember(initial) { mutableStateOf(initial) }
+    val clean = GroupMutations.normalizeName(name)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        title = {
+            Text(
+                text = stringResource(if (create) R.string.group_name_title else R.string.group_rename),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it.take(GroupMutations.NAME_MAX) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = FocoPaper),
+                placeholder = {
+                    Text(
+                        text = stringResource(R.string.group_name_hint),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { clean?.let(onConfirm) }),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = FocoPaper,
+                    unfocusedTextColor = FocoPaper,
+                    focusedBorderColor = FocoPaperDim,
+                    unfocusedBorderColor = FocoLine,
+                    cursorColor = FocoPaper,
+                    focusedPlaceholderColor = FocoPaperDim,
+                    unfocusedPlaceholderColor = FocoPaperDim,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                ),
+            )
+        },
+        confirmButton = {
+            FocoTextButton(onClick = { clean?.let(onConfirm) }, enabled = clean != null) {
+                Text(stringResource(if (create) R.string.group_create else R.string.group_save))
+            }
+        },
+        dismissButton = {
+            FocoTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.group_cancel))
+            }
+        },
+    )
+}
+
+private sealed interface HomeSheet {
+    data class Personal(val app: LaunchableApp) : HomeSheet
+    data class Work(val app: WorkApp) : HomeSheet
+    data class Pick(val section: GroupSection, val memberId: String, val label: String) : HomeSheet
+    data class Open(val groupId: String) : HomeSheet
+}
+
+private data class GroupNameRequest(
+    val section: GroupSection,
+    val memberId: String?,
+    val groupId: String?,
+    val initial: String,
+)
 
 @Composable
 private fun Modifier.longPressEmpty(onLongClick: () -> Unit): Modifier {
