@@ -935,7 +935,7 @@ private fun AppCell(
 
 @Composable
 private fun FolderIcon(icons: List<Bitmap?>, description: String, alpha: Float) {
-    val slots = if (icons.isEmpty()) listOf(null) else icons.take(4)
+    val slots = List(4) { index -> icons.getOrNull(index) }
     Box(
         modifier = Modifier
             .size(48.dp)
