@@ -2,5 +2,5 @@
 <resources>
     <color name="foco_background">#FF0E0E0E</color>
     <color name="foco_icon_bg">#FF1A1A1A</color>
-    <color name="foco_icon_ring">#FFE8E4DC</color>
+    <color name="foco_icon_ring">#FFE6E6E6</color>
 </resources>

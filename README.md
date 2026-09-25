@@ -21,8 +21,6 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 
 El APK de debug lo firma `signing/foco-debug.keystore` (alias `foco-debug`, passwords `android`). Esa clave se generó para el repo en 0.7.0. Si `adb install -r` responde `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, desinstalá la build anterior y volvé a instalar. A partir de esta clave, las builds de debug del repo se pisan entre sí.
 
-El santoral del inicio es el calendario universal del misal de 1962 (rúbricas de 1960), en `app/src/main/assets/santoral_1962.json`. La etiqueta en el home es «Santoral».
-
 ```
 app/build/outputs/apk/debug/app-debug.apk
 ```

@@ -60,6 +60,8 @@ class LaunchpadGuardTest {
         assertFalse(src.contains("personal_edit"))
         assertFalse(src.contains("Icons.Outlined.Refresh"))
         assertFalse(src.contains("AppWidgetHost"))
+        assertFalse(src.contains("Santoral"))
+        assertFalse(src.contains("open-meteo"))
         assertTrue(src.contains("home_empty"))
         assertTrue(src.contains("home_add"))
         val clockSrc = File("src/main/java/com/foco/launcher/core/HomeClockFormat.kt").readText()

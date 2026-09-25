@@ -104,9 +104,7 @@
     <string name="settings_system">Ajustes del teléfono</string>
     <string name="settings_version">Versión</string>
     <string name="settings_about_body">Foco puede ocultar Trabajo y silenciar avisos. No cambia el perfil del sistema.</string>
-    <string name="settings_about_calendar">El santoral sigue el misal tradicional de 1962.</string>
     <string name="settings_pause_note">Pausar Trabajo no es la pausa del perfil de trabajo de Android. Pausar avisos no es el No molestar del teléfono.</string>
-    <string name="santoral_label">Santoral</string>
     <string name="settings_look">Apariencia</string>
     <string name="look_no_icons">Mostrar solo nombres</string>
     <string name="look_no_icons_sub">Oculta los íconos de las apps. Cuesta reconocerlas al principio; baja el estímulo visual.</string>

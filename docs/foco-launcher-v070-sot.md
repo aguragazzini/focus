@@ -8,3 +8,5 @@ Attached notes:
 Product override on Camila §3.1: **Pausar avisos is silence.** While `notificationsPaused` is on, the listener cancels in-scope notifications (Andrés §2). It does not turn the filter off. Shipped copy is `Pausar avisos`, `Reanudar avisos`, and the chip `Avisos · En pausa`. Do not ship `Pausar filtro de avisos`, `Avisos · Sin filtro`, or “deja de filtrar”.
 
 Trabajo folders only organize. Every work launchable stays on the list when the section is visible (Andrés A1). Pausar Trabajo hides the section and cancels work notifications in Foco. It does not write system quiet mode.
+
+Santoral, extra widgets, and AppWidgetHost are deferred past 0.7.0. The home under the clock is the date and the local battery/alarm glance. App icons stay on by default. `Mostrar solo nombres` stays opt-in and off until the user turns it on.

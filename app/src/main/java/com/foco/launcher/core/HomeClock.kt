@@ -29,8 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.foco.launcher.R
 import kotlinx.coroutines.delay
-import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 @Composable
@@ -41,8 +39,6 @@ fun HomeClock(
     nowMillis: () -> Long = System::currentTimeMillis,
     zone: ZoneId = ZoneId.systemDefault(),
     readGlance: () -> String? = { null },
-    readExtra: () -> String? = { null },
-    underDate: @Composable (LocalDate) -> Unit = {},
 ) {
     var now by remember { mutableLongStateOf(nowMillis()) }
     LaunchedEffect(zone) {
@@ -56,11 +52,7 @@ fun HomeClock(
     }
     val time = HomeClockFormat.time(now, zone)
     val date = HomeClockFormat.date(now, zone)
-    val day = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
-    val glance = listOf(readGlance(), readExtra())
-        .mapNotNull { it?.trim()?.takeIf { line -> line.isNotEmpty() } }
-        .joinToString(" · ")
-        .ifBlank { null }
+    val glance = readGlance()?.trim()?.takeIf { it.isNotEmpty() }
     val timeCd = stringResource(R.string.clock_time_cd, time)
     val dateCd = stringResource(R.string.clock_date_cd, date)
     Column(
@@ -106,10 +98,8 @@ fun HomeClock(
             ),
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(8.dp))
-        underDate(day)
         if (!glance.isNullOrBlank()) {
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(8.dp))
             Text(
                 text = glance,
                 modifier = Modifier.padding(horizontal = 12.dp),

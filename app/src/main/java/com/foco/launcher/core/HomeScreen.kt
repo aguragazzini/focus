@@ -314,24 +314,11 @@ fun HomeScreen(
             ) {
                 item(key = "clock") {
                     Spacer(Modifier.height(12.dp))
-                    val catalog = remember(context) {
-                        runCatching {
-                            context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
-                                Santoral1962.parse(reader.readText())
-                            }
-                        }.getOrNull()
-                    }
-                    val temperature = rememberLocalTemperature()
                     HomeClock(
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
                         modifier = Modifier.padding(horizontal = 24.dp),
                         readGlance = { HomeGlance.line(context) },
-                        readExtra = { temperature },
-                        underDate = { date ->
-                            val feast = catalog?.let { Santoral1962.resolve(it, date) }
-                            if (feast != null) SantoralLine(feast)
-                        },
                     )
                     if (state.notificationsPaused || (state.workSectionPaused && state.hasWorkProfile)) {
                         Spacer(Modifier.height(16.dp))
@@ -851,7 +838,13 @@ private fun HomeOverflow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenu(
+                expanded = menu,
+                onDismissRequest = { menu = false },
+                containerColor = FocoInkElevated,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+            ) {
                 OverflowItem(R.string.menu_add) { pending = onAddApps; menu = false }
                 OverflowItem(R.string.menu_edit) { pending = onEditApps; menu = false }
                 OverflowItem(R.string.menu_settings) { pending = onOpenFocoSettings; menu = false }
