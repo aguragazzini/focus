@@ -2,6 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Android 11+: see apps that declare a launcher intent. Prefer this over QUERY_ALL_PACKAGES. -->
     <queries>

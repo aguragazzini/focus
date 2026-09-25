@@ -121,6 +121,136 @@ class NotificationPolicyTest {
     }
 
     @Test
+    fun workPauseCancelsWorkButSparesCallAlarmNavMediaAndSystem() {
+        val work = personal.copy(packageName = "com.slack", isWorkOrOtherProfile = true)
+        assertTrue(
+            NotificationPolicy.shouldSuppress(
+                facts = work,
+                nlsFilterEnabled = false,
+                allowlist = emptySet(),
+                workSectionPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = work.copy(category = NotificationPolicy.CATEGORY_CALL),
+                nlsFilterEnabled = false,
+                allowlist = emptySet(),
+                workSectionPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = work.copy(category = NotificationPolicy.CATEGORY_ALARM),
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                workSectionPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = work.copy(category = NotificationPolicy.CATEGORY_NAVIGATION),
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                workSectionPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = work.copy(isMediaStyle = true),
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                workSectionPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = work.copy(packageName = "com.android.systemui"),
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                workSectionPaused = true,
+                notificationsPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = personal,
+                nlsFilterEnabled = false,
+                allowlist = emptySet(),
+                workSectionPaused = true,
+            ),
+        )
+    }
+
+    @Test
+    fun notificationsPauseCancelsPersonalAndWorkExceptSpares() {
+        assertTrue(
+            NotificationPolicy.shouldSuppress(
+                facts = personal.copy(packageName = "com.instagram.android"),
+                nlsFilterEnabled = false,
+                allowlist = setOf("com.instagram.android"),
+                notificationsPaused = true,
+            ),
+        )
+        assertTrue(
+            NotificationPolicy.shouldSuppress(
+                facts = personal.copy(isWorkOrOtherProfile = true, packageName = "com.slack"),
+                nlsFilterEnabled = false,
+                allowlist = emptySet(),
+                notificationsPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = personal.copy(category = NotificationPolicy.CATEGORY_ALARM),
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                notificationsPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = personal.copy(hasMediaSession = true),
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                notificationsPaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = personal,
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                listenerGranted = false,
+                notificationsPaused = true,
+                workSectionPaused = true,
+            ),
+        )
+    }
+
+    @Test
+    fun pauseFlagsOffKeepsWorkPassAndAllowlistPolicy() {
+        val work = personal.copy(isWorkOrOtherProfile = true)
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = work,
+                nlsFilterEnabled = true,
+                allowlist = emptySet(),
+                workSectionPaused = false,
+                notificationsPaused = false,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = personal,
+                nlsFilterEnabled = true,
+                allowlist = setOf(personal.packageName),
+                notificationsPaused = false,
+            ),
+        )
+    }
+
+    @Test
     fun systemOemNeverCancel() {
         val sys = personal.copy(packageName = "com.android.systemui")
         val moto = personal.copy(packageName = "com.motorola.android.settings")

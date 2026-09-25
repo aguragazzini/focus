@@ -21,7 +21,12 @@ class LaunchpadGuardTest {
     @Test
     fun launcherDoesNotPauseOrAdministerWork() {
         val root = File("src/main/java")
-        val banned = listOf("DevicePolicyManager", "requestQuietModeEnabled", "QUERY_ALL_PACKAGES")
+        val banned = listOf(
+            "DevicePolicyManager",
+            "requestQuietModeEnabled",
+            "QUERY_ALL_PACKAGES",
+            "setInterruptionFilter",
+        )
         val hits = root.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
             .flatMap { file ->

@@ -18,6 +18,12 @@ data class LauncherPrefs(
     val nlsFilterEnabled: Boolean = false,
     /** Home folders. Absent on v0.5.1 documents; decode falls back to empty. */
     val groups: List<AppGroup> = emptyList(),
+    /** Hide the Trabajo section and cancel in-scope work notifications. Not system quiet mode. */
+    val workSectionPaused: Boolean = false,
+    /** Foco silence. Cancels in-scope notifications. Not system Do Not Disturb. */
+    val notificationsPaused: Boolean = false,
+    /** Text-first tiles. Default off so icons stay on. */
+    val namesOnly: Boolean = false,
 ) {
     /** Andrés: personal packages that may notify. Derived from home + allowNotif. */
     val notificationAllowlist: Set<String>

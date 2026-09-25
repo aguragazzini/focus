@@ -29,8 +29,9 @@ secrets*
 .envrc
 google-services.json
 
-# Signing material — debug uses the local Gradle keystore (~/.android/debug.keystore)
+# Release signing stays out. signing/foco-debug.keystore is the shared debug key.
 *.jks
 *.keystore
+!signing/foco-debug.keystore
 *.p12
 *.pem

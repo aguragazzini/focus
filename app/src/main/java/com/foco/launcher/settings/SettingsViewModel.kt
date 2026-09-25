@@ -61,6 +61,9 @@ data class SettingsUiState(
     val workRefreshing: Boolean = false,
     val workLink: Boolean = false,
     val workNote: String? = null,
+    val workSectionPaused: Boolean = false,
+    val notificationsPaused: Boolean = false,
+    val namesOnly: Boolean = false,
 )
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
@@ -233,6 +236,25 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         nlsMessage.value = getApplication<Application>().getString(com.foco.launcher.R.string.nls_open_fail)
     }
 
+    fun setWorkSectionPaused(paused: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setWorkSectionPaused(paused)
+            if (!paused) app.workCatalog.refresh()
+        }
+    }
+
+    fun setNotificationsPaused(paused: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setNotificationsPaused(paused)
+        }
+    }
+
+    fun setNamesOnly(enabled: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setNamesOnly(enabled)
+        }
+    }
+
     fun setNotifAllowed(packageName: String, allowed: Boolean) {
         viewModelScope.launch {
             app.prefsStore.setAllowNotif(packageName, allowed)
@@ -344,6 +366,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             hasWorkProfile = UserProfileHelper.hasWorkProfile(getApplication()),
             avisosRows = rows,
             nlsMessage = message,
+            workSectionPaused = core.prefs.workSectionPaused,
+            notificationsPaused = core.prefs.notificationsPaused,
+            namesOnly = core.prefs.namesOnly,
         )
     }
 

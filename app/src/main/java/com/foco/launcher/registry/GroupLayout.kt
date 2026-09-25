@@ -7,7 +7,8 @@ package com.foco.launcher.registry
  * in the section's existing order: whitelist order for Personal, catalog order
  * for Trabajo. An app that sits in a group is not repeated on the loose grid.
  * Members that are not in [orderedIds] are hidden so a stale id cannot draw a
- * ghost tile. Drag-reorder is not part of this version.
+ * ghost tile. Every id in [orderedIds] is still either loose or inside a folder,
+ * so a work folder organizes the catalog and does not filter apps out of it.
  *
  * Trabajo search is a separate path: a non-blank query hides group tiles and
  * lists every matching launchable, including apps that belong to a group.

@@ -25,5 +25,8 @@ class LauncherPrefsTest {
     fun emptyHomeMeansEmptyAllowlist() {
         assertTrue(LauncherPrefs().notificationAllowlist.isEmpty())
         assertFalse(LauncherPrefs().nlsFilterEnabled)
+        assertFalse(LauncherPrefs().workSectionPaused)
+        assertFalse(LauncherPrefs().notificationsPaused)
+        assertFalse(LauncherPrefs().namesOnly)
     }
 }

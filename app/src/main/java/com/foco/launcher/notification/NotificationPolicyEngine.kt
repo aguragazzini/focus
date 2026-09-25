@@ -26,12 +26,15 @@ class NotificationPolicyEngine(
                 val next = Snapshot(
                     nlsFilterEnabled = prefs.nlsFilterEnabled,
                     packages = prefs.notificationAllowlist,
+                    workSectionPaused = prefs.workSectionPaused,
+                    notificationsPaused = prefs.notificationsPaused,
                 )
                 val prev = snapshot.getAndSet(next)
                 if (next.nlsFilterEnabled && !prev.nlsFilterEnabled && NlsStatus.isGranted(appContext)) {
                     NlsStatus.requestRebind(appContext)
                 }
-                if (next.nlsFilterEnabled) {
+                val suppressActive = next.nlsFilterEnabled || next.workSectionPaused || next.notificationsPaused
+                if (suppressActive && next != prev) {
                     FocoNotificationListener.scrubIfConnected()
                 }
             }
@@ -56,11 +59,15 @@ class NotificationPolicyEngine(
             nlsFilterEnabled = current.nlsFilterEnabled,
             allowlist = current.packages,
             listenerGranted = NlsStatus.isGranted(appContext),
+            workSectionPaused = current.workSectionPaused,
+            notificationsPaused = current.notificationsPaused,
         )
     }
 
     private data class Snapshot(
         val nlsFilterEnabled: Boolean = false,
         val packages: Set<String> = emptySet(),
+        val workSectionPaused: Boolean = false,
+        val notificationsPaused: Boolean = false,
     )
 }

@@ -67,6 +67,9 @@ class SettingsActivity : ComponentActivity() {
                     onNlsMessageShown = vm::clearNlsMessage,
                     onRefreshWork = vm::refreshWorkList,
                     onOpenWorkSettings = { LaunchController.openWorkProfileSettings(this) },
+                    onWorkPaused = vm::setWorkSectionPaused,
+                    onNotificationsPaused = vm::setNotificationsPaused,
+                    onNamesOnly = vm::setNamesOnly,
                 )
             }
         }

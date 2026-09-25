@@ -90,6 +90,12 @@ class LauncherActivity : ComponentActivity() {
                     onRenameGroup = vm::renameGroup,
                     onRemoveFromGroup = vm::removeFromGroup,
                     onDeleteGroup = vm::deleteGroup,
+                    onDragOntoApp = vm::dragOntoApp,
+                    onDragIntoFolder = vm::dragIntoFolder,
+                    onDragEject = vm::dragEject,
+                    onWorkPaused = vm::setWorkSectionPaused,
+                    onNotificationsPaused = vm::setNotificationsPaused,
+                    onCrossHint = vm::showCrossSectionHint,
                     onEnsureWorkIcon = vm::ensureWorkIcon,
                     onOpenWorkSettings = {
                         LaunchController.openWorkProfileSettings(this)

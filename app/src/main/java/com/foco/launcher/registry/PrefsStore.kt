@@ -52,6 +52,18 @@ class PrefsStore(context: Context) {
         update { it.copy(nlsFilterEnabled = enabled) }
     }
 
+    suspend fun setWorkSectionPaused(paused: Boolean) {
+        update { it.copy(workSectionPaused = paused) }
+    }
+
+    suspend fun setNotificationsPaused(paused: Boolean) {
+        update { it.copy(notificationsPaused = paused) }
+    }
+
+    suspend fun setNamesOnly(enabled: Boolean) {
+        update { it.copy(namesOnly = enabled) }
+    }
+
     suspend fun setAllowNotif(packageName: String, allowed: Boolean) {
         update { prefs ->
             prefs.copy(
