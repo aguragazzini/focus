@@ -12,6 +12,9 @@ object HomeClockFormat {
     const val TIME_SP = 52
     const val DATE_SP = 14
 
+    /** Civil clock for Reloj and both sanctorales. Same zone as the diet week. */
+    val CIVIL_ZONE: ZoneId = ZoneId.of("America/Argentina/Cordoba")
+
     fun time(epochMillis: Long, zone: ZoneId): String {
         val local = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalTime()
         return "%02d:%02d".format(local.hour, local.minute)

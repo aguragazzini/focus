@@ -118,7 +118,7 @@ fun HomeLoading(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(FocoSpace.gapLg))
             Text(
                 text = stringResource(R.string.home_loading),
                 style = MaterialTheme.typography.bodyMedium,
@@ -165,6 +165,8 @@ fun HomeScreen(
     onMovePage: (String, Int) -> Unit = { _, _ -> },
     onHidePage: (String, Boolean) -> Unit = { _, _ -> },
     onDeletePage: (String) -> Unit = {},
+    onPhonePaused: (Boolean) -> Unit = {},
+    onPackagePaused: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -381,6 +383,8 @@ fun HomeScreen(
                         onChooseDefault = onChooseDefault,
                         onOpenAvisos = onOpenAvisos,
                         onNotificationsPaused = onNotificationsPaused,
+                        onPhonePaused = onPhonePaused,
+                        onPackagePaused = onPackagePaused,
                         onLaunch = onLaunch,
                         onOpenGroup = { openedGroupId = it },
                         onPersonalSheet = { sheet = HomeSheet.Personal(it) },
@@ -408,6 +412,8 @@ fun HomeScreen(
                         onChooseDefault = onChooseDefault,
                         onOpenAvisos = onOpenAvisos,
                         onNotificationsPaused = onNotificationsPaused,
+                        onPhonePaused = onPhonePaused,
+                        onPackagePaused = onPackagePaused,
                         onLaunch = onLaunch,
                         onOpenGroup = { openedGroupId = it },
                         onPersonalSheet = { sheet = HomeSheet.Personal(it) },
@@ -525,10 +531,16 @@ fun HomeScreen(
             when (activeSheet) {
                 is HomeSheet.Personal -> PersonalAppSheet(
                     app = activeSheet.app,
+                    paused = activeSheet.app.packageName in state.pausedPackages,
                     onOpen = {
                         val pkg = activeSheet.app.packageName
                         sheet = null
                         onLaunch(pkg)
+                    },
+                    onPause = {
+                        val pkg = activeSheet.app.packageName
+                        val paused = pkg in state.pausedPackages
+                        onPackagePaused(pkg, !paused)
                     },
                     onAddToGroup = {
                         sheet = HomeSheet.Pick(
@@ -550,10 +562,16 @@ fun HomeScreen(
                 )
                 is HomeSheet.Work -> WorkAppSheet(
                     app = activeSheet.app,
+                    paused = activeSheet.app.packageName in state.pausedPackages,
                     onOpen = {
                         val target = activeSheet.app
                         sheet = null
                         if (state.workKind == WorkSectionKind.Quiet) onQuietTap() else onLaunchWork(target)
+                    },
+                    onPause = {
+                        val pkg = activeSheet.app.packageName
+                        val paused = pkg in state.pausedPackages
+                        onPackagePaused(pkg, !paused)
                     },
                     onAddToGroup = {
                         sheet = HomeSheet.Pick(
@@ -740,7 +758,7 @@ private fun HomeEditSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(start = 24.dp, end = 24.dp, bottom = 28.dp),
+                .padding(start = FocoSpace.page, end = FocoSpace.page, bottom = FocoSpace.sheet),
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -927,12 +945,13 @@ private fun ClockHomePage(
             .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(FocoSpace.gapLg))
         HomeClock(
             onOpenClock = onOpenClock,
             onOpenCalendar = onOpenCalendar,
-            modifier = Modifier.padding(horizontal = 24.dp),
-            readGlance = { HomeGlance.line(context) },
+            modifier = Modifier.padding(horizontal = FocoSpace.page),
+            zone = HomeClockFormat.CIVIL_ZONE,
+            readGlance = { HomeGlance.line(context, HomeClockFormat.CIVIL_ZONE) },
             underDate = { date ->
                 val traditional = vetus?.let { Santoral1962.resolve(it, date) }
                 if (traditional != null) {
@@ -975,6 +994,8 @@ private fun PersonalHomePage(
     onChooseDefault: () -> Unit,
     onOpenAvisos: () -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
+    onPackagePaused: (String, Boolean) -> Unit,
     onLaunch: (String) -> Unit,
     onOpenGroup: (String) -> Unit,
     onPersonalSheet: (LaunchableApp) -> Unit,
@@ -995,26 +1016,33 @@ private fun PersonalHomePage(
                     HomeBanner.None -> Unit
                 }
                 if (state.banner != HomeBanner.None) {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(FocoSpace.section))
                 }
             }
         }
         item(key = "$pageKey:personal-header") {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(FocoSpace.gap))
             SectionTitle(
                 text = title.ifBlank { stringResource(titleFallback) },
-                modifier = Modifier.padding(horizontal = 24.dp),
+                modifier = Modifier.padding(horizontal = FocoSpace.page),
             )
             if (showPause) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(FocoSpace.gap))
                 PagePause(
                     paused = state.notificationsPaused,
                     idle = stringResource(R.string.nls_pause),
                     active = stringResource(R.string.nls_paused_chip),
                     onClick = { onNotificationsPaused(!state.notificationsPaused) },
                 )
+                Spacer(Modifier.height(FocoSpace.gap))
+                PagePause(
+                    paused = state.phonePaused,
+                    idle = stringResource(R.string.phone_pause),
+                    active = stringResource(R.string.phone_paused_chip),
+                    onClick = { onPhonePaused(!state.phonePaused) },
+                )
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(FocoSpace.section))
         }
         if (arranged.groups.isEmpty() && arranged.looseIds.isEmpty()) {
             item(key = "$pageKey:personal-empty") {
@@ -1025,9 +1053,12 @@ private fun PersonalHomePage(
             }
         } else {
             val personalByPkg = state.apps.associateBy { it.packageName }
+            val paused = state.pausedPackages.toSet()
             val rows = sectionCells(
                 arranged = arranged,
-                loose = { id -> personalByPkg[id]?.toCell() },
+                loose = { id ->
+                    personalByPkg[id]?.toCell()?.copy(paused = id in paused)
+                },
                 folder = { group ->
                     val members = group.members.mapNotNull { personalByPkg[it] }
                     group.toCell(members.map { it.icon }, labels = members.map { it.label })
@@ -1047,7 +1078,7 @@ private fun PersonalHomePage(
                     drag = drag,
                     dragApps = true,
                     fromGroupId = null,
-                    modifier = Modifier.padding(horizontal = 24.dp),
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
                     onClick = { cell ->
                         if (cell.groupId != null) {
                             onOpenGroup(cell.groupId)
@@ -1106,13 +1137,13 @@ private fun WorkHomePage(
     val focoPaused = state.workSectionPaused && state.hasWorkProfile
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item(key = "$pageKey:work-header") {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(FocoSpace.gap))
             SectionTitle(
                 text = title.ifBlank { stringResource(R.string.section_work) },
-                modifier = Modifier.padding(horizontal = 24.dp),
+                modifier = Modifier.padding(horizontal = FocoSpace.page),
             )
             if (state.hasWorkProfile) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(FocoSpace.gap))
                 PagePause(
                     paused = focoPaused,
                     idle = stringResource(R.string.work_pause),
@@ -1120,7 +1151,7 @@ private fun WorkHomePage(
                     onClick = { onWorkPaused(!state.workSectionPaused) },
                 )
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(FocoSpace.gapLg))
         }
         if (focoPaused) {
             item(key = "$pageKey:work-paused") {
@@ -1128,7 +1159,7 @@ private fun WorkHomePage(
                     text = stringResource(R.string.work_pause_status),
                     style = MaterialTheme.typography.bodyLarge,
                     color = FocoPaperDim,
-                    modifier = Modifier.padding(horizontal = 24.dp),
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
                 )
             }
         } else if (state.workKind == WorkSectionKind.Hidden) {
@@ -1137,7 +1168,7 @@ private fun WorkHomePage(
                     text = stringResource(R.string.settings_work_none),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 24.dp),
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
                 )
             }
         } else {
@@ -1155,7 +1186,7 @@ private fun WorkHomePage(
             when {
                 WorkCatalogRules.showErrorCopy(state.workKind) -> {
                     item(key = "$pageKey:work-error") {
-                        Column(Modifier.padding(horizontal = 24.dp)) {
+                        Column(Modifier.padding(horizontal = FocoSpace.page)) {
                             Text(
                                 text = stringResource(R.string.work_load_error),
                                 style = MaterialTheme.typography.bodyLarge,
@@ -1173,7 +1204,7 @@ private fun WorkHomePage(
                             text = stringResource(R.string.work_empty),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 24.dp),
+                            modifier = Modifier.padding(horizontal = FocoSpace.page),
                         )
                     }
                 }
@@ -1183,7 +1214,7 @@ private fun WorkHomePage(
                             text = stringResource(R.string.work_search_empty),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(horizontal = 24.dp),
+                            modifier = Modifier.padding(horizontal = FocoSpace.page),
                         )
                     }
                 }
@@ -1197,14 +1228,19 @@ private fun WorkHomePage(
                 ) -> {
                     val byKey = state.workApps.associateBy { it.key }
                     val muted = state.workKind == WorkSectionKind.Quiet
+                    val pausedPkgs = state.pausedPackages.toSet()
                     val searching = searchOpen && query.isNotBlank()
                     val cells = if (searching) {
-                        visible.map { app -> app.toCell(state.workIcons[app.key], muted) }
+                        visible.map { app ->
+                            app.toCell(state.workIcons[app.key], muted, app.packageName in pausedPkgs)
+                        }
                     } else {
                         sectionCells(
                             arranged = arranged,
                             loose = { id ->
-                                byKey[id]?.toCell(state.workIcons[id], muted)
+                                byKey[id]?.let { app ->
+                                    app.toCell(state.workIcons[id], muted, app.packageName in pausedPkgs)
+                                }
                             },
                             folder = { group ->
                                 val icons = group.members.map { state.workIcons[it] }
@@ -1228,7 +1264,7 @@ private fun WorkHomePage(
                             drag = drag,
                             dragApps = !searching,
                             fromGroupId = null,
-                            modifier = Modifier.padding(horizontal = 24.dp),
+                            modifier = Modifier.padding(horizontal = FocoSpace.page),
                             onClick = { cell ->
                                 if (cell.groupId != null) {
                                     onOpenGroup(cell.groupId)
@@ -1301,7 +1337,7 @@ private fun HomePagerCue(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 2.dp, bottom = 4.dp),
+            .padding(top = FocoSpace.hair, bottom = FocoSpace.gap),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(horizontalArrangement = Arrangement.Center) {
@@ -1309,7 +1345,7 @@ private fun HomePagerCue(
                 val selected = index == safePage
                 Box(
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(FocoSpace.touch)
                         .clickable { onSelect(index) }
                         .semantics { contentDescription = label },
                     contentAlignment = Alignment.Center,
@@ -1347,11 +1383,11 @@ private fun PagePause(
     Text(
         text = label,
         modifier = Modifier
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = FocoSpace.page)
             .clip(RoundedCornerShape(50))
             .background(if (paused) FocoInkElevated else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.gap)
             .semantics { contentDescription = label },
         style = MaterialTheme.typography.bodyMedium,
         color = FocoPaperDim,
@@ -1477,7 +1513,7 @@ private fun BannerRow(message: String, action: String, onAction: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 24.dp),
+                .padding(start = FocoSpace.page),
         )
         FocoTextButton(onClick = onAction) {
             Text(action)
@@ -1496,12 +1532,12 @@ private fun WorkHeader(
     onOpenWorkSettings: () -> Unit,
 ) {
     val focus = LocalFocusManager.current
-    Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+    Column(modifier = Modifier.padding(horizontal = FocoSpace.page)) {
         if (showTitle) {
             SectionTitle(text = stringResource(R.string.section_work))
         }
         if (WorkCatalogRules.showQuietCopy(kind)) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(FocoSpace.gap))
             Text(
                 text = stringResource(R.string.work_quiet_title),
                 style = MaterialTheme.typography.bodyMedium,
@@ -1514,7 +1550,7 @@ private fun WorkHeader(
             }
         }
         if (showSearch) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(FocoSpace.gap))
             OutlinedTextField(
                 value = query,
                 onValueChange = onQuery,
@@ -1543,7 +1579,7 @@ private fun WorkHeader(
                 ),
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(FocoSpace.gapLg))
     }
 }
 
@@ -1552,7 +1588,7 @@ private fun PersonalEmptyInline(onAddApps: () -> Unit, onOpenSystemSettings: () 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+            .padding(horizontal = FocoSpace.page)
             .homeLongPress(onOpenSystemSettings),
     ) {
         Text(
@@ -1588,7 +1624,7 @@ private fun SheetAction(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = FocoSpace.page, vertical = FocoSpace.section),
     )
 }
 
@@ -1597,6 +1633,8 @@ private data class HomeCell(
     val label: String,
     val icon: Bitmap? = null,
     val muted: Boolean = false,
+    val paused: Boolean = false,
+    val packageName: String? = null,
     val groupId: String? = null,
     val folderIcons: List<Bitmap?> = emptyList(),
     val memberLabels: List<String> = emptyList(),
@@ -1604,9 +1642,21 @@ private data class HomeCell(
     val key: String get() = if (groupId != null) "g:$groupId" else id
 }
 
-private fun LaunchableApp.toCell(): HomeCell = HomeCell(packageName, label, icon)
+private fun LaunchableApp.toCell(): HomeCell = HomeCell(
+    id = packageName,
+    label = label,
+    icon = icon,
+    packageName = packageName,
+)
 
-private fun WorkApp.toCell(icon: Bitmap?, muted: Boolean): HomeCell = HomeCell(key, label, icon, muted)
+private fun WorkApp.toCell(icon: Bitmap?, muted: Boolean, paused: Boolean = false): HomeCell = HomeCell(
+    id = key,
+    label = label,
+    icon = icon,
+    muted = muted,
+    paused = paused,
+    packageName = packageName,
+)
 
 private fun AppGroup.toCell(
     icons: List<Bitmap?>,
@@ -1685,7 +1735,7 @@ private fun AppRow(
     DisposableEffect(rowKey) {
         onDispose { drag.removeRow(rowKey) }
     }
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(FocoSpace.section))
 }
 
 @Composable
@@ -1721,7 +1771,7 @@ private fun AppCell(
         chrome.fromGroupId == fromGroupId &&
         cell.groupId == null
     val canDrag = dragApps && cell.groupId == null
-    val iconAlpha = if (cell.muted) 0.4f else 1f
+    val iconAlpha = if (cell.muted || cell.paused) 0.4f else 1f
     Column(
         modifier = modifier
             .then(
@@ -1773,10 +1823,11 @@ private fun AppCell(
             },
         )
         Spacer(Modifier.height(6.dp))
+        val pausedMark = stringResource(R.string.app_paused_mark)
         Text(
-            text = cell.label,
+            text = if (cell.paused) cell.label + "\n" + pausedMark else cell.label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (cell.muted) FocoPaperDim else MaterialTheme.colorScheme.onBackground,
+            color = if (cell.muted || cell.paused) FocoPaperDim else MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -1956,17 +2007,25 @@ private fun MiniIcon(bitmap: Bitmap?) {
 @Composable
 private fun PersonalAppSheet(
     app: LaunchableApp,
+    paused: Boolean,
     onOpen: () -> Unit,
+    onPause: () -> Unit,
     onAddToGroup: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(bottom = FocoSpace.gapLg),
     ) {
         SheetTitle(app.label)
-        SheetAction(stringResource(R.string.lp_open), onOpen)
+        if (!paused) {
+            SheetAction(stringResource(R.string.lp_open), onOpen)
+        }
+        SheetAction(
+            stringResource(if (paused) R.string.app_resume else R.string.app_pause),
+            onPause,
+        )
         SheetAction(stringResource(R.string.group_add), onAddToGroup)
         SheetAction(stringResource(R.string.lp_remove), onRemove)
     }
@@ -1975,16 +2034,24 @@ private fun PersonalAppSheet(
 @Composable
 private fun WorkAppSheet(
     app: WorkApp,
+    paused: Boolean,
     onOpen: () -> Unit,
+    onPause: () -> Unit,
     onAddToGroup: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(bottom = FocoSpace.gapLg),
     ) {
         SheetTitle(app.label)
-        SheetAction(stringResource(R.string.lp_open), onOpen)
+        if (!paused) {
+            SheetAction(stringResource(R.string.lp_open), onOpen)
+        }
+        SheetAction(
+            stringResource(if (paused) R.string.app_resume else R.string.app_pause),
+            onPause,
+        )
         SheetAction(stringResource(R.string.group_add), onAddToGroup)
     }
 }
@@ -2072,7 +2139,7 @@ private fun MemberRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen)
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val alpha = if (muted) 0.4f else 1f
@@ -2116,7 +2183,7 @@ private fun SheetTitle(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyLarge,
         color = FocoPaper,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
     )
 }
 
@@ -2277,7 +2344,7 @@ private fun OpenFolderOverlay(
                 text = group.name,
                 style = MaterialTheme.typography.bodyLarge,
                 color = FocoPaper,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
             )
             cells.chunked(4).forEach { row ->
                 AppRow(

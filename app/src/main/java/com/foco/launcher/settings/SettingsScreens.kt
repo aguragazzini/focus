@@ -53,9 +53,11 @@ import com.foco.launcher.core.FocoLine
 import com.foco.launcher.core.FocoPaper
 import com.foco.launcher.core.FocoPaperDim
 import com.foco.launcher.core.FocoPrimaryButton
+import com.foco.launcher.core.FocoSpace
 import com.foco.launcher.core.FocoTextButton
 import com.foco.launcher.core.LaunchpadRules
 import com.foco.launcher.registry.LaunchableApp
+import com.foco.launcher.security.PinSettingsRow
 import com.foco.launcher.work.WorkCatalogRules
 import com.foco.launcher.work.WorkSettingsStatus
 
@@ -86,6 +88,7 @@ fun SettingsHost(
     onOpenWorkSettings: () -> Unit,
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
 ) {
@@ -103,6 +106,7 @@ fun SettingsHost(
             onOpenWorkSettings = onOpenWorkSettings,
             onWorkPaused = onWorkPaused,
             onNotificationsPaused = onNotificationsPaused,
+            onPhonePaused = onPhonePaused,
             onNamesOnly = onNamesOnly,
             onEditHome = onEditHome,
         )
@@ -161,6 +165,7 @@ private fun SettingsMain(
     onOpenWorkSettings: () -> Unit,
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
 ) {
@@ -217,6 +222,7 @@ private fun SettingsMain(
                         subtitle = stringResource(R.string.settings_home_sub),
                         onClick = onEditHome,
                     )
+                    PinSettingsRow()
                 }
                 HorizontalDivider()
                 Column(modifier = Modifier.padding(top = 8.dp)) {
@@ -239,6 +245,12 @@ private fun SettingsMain(
                         subtitle = stringResource(R.string.nls_pause_sub),
                         checked = state.notificationsPaused,
                         onCheckedChange = onNotificationsPaused,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.phone_pause),
+                        subtitle = stringResource(R.string.phone_pause_sub),
+                        checked = state.phonePaused,
+                        onCheckedChange = onPhonePaused,
                     )
                 }
                 SettingsRow(
@@ -410,13 +422,13 @@ private fun SettingsSwitchRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    horizontalInset: Dp = 20.dp,
+    horizontalInset: Dp = FocoSpace.page,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = horizontalInset, vertical = 8.dp),
+            .padding(horizontal = horizontalInset, vertical = FocoSpace.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {

@@ -94,15 +94,15 @@ fun DietPage(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = FocoSpace.page),
     ) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(FocoSpace.gap))
         DayStrip(
             today = today.dayOfWeek,
             selected = selected,
             onSelect = { selectedName = it.name },
         )
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(FocoSpace.sheet))
         if (day == null) {
             Text(
                 text = stringResource(R.string.diet_missing),
@@ -113,7 +113,7 @@ fun DietPage(
         } else {
             DietDetail(day)
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(FocoSpace.page))
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -197,7 +197,7 @@ private fun DietDetail(day: DietDay) {
                 text = rule,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 12.dp),
+                    .padding(bottom = FocoSpace.gapLg),
                 style = dietPaper(15),
                 textAlign = TextAlign.Center,
             )
@@ -208,7 +208,7 @@ private fun DietDetail(day: DietDay) {
     DetailMeal(stringResource(R.string.diet_lunch), day.lunch, day.lunchTip)
     DetailMeal(stringResource(R.string.diet_dinner), day.dinner, day.dinnerTip)
     if (day.alternateTitles.isNotEmpty()) {
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(FocoSpace.gap))
         Text(
             text = stringResource(R.string.diet_alts),
             modifier = Modifier.fillMaxWidth(),
@@ -252,12 +252,12 @@ private fun DetailMeal(label: String, value: String, tip: String) {
             text = tip,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 2.dp, bottom = 16.dp),
+                .padding(top = FocoSpace.hair, bottom = FocoSpace.section),
             style = dietDim(13),
             textAlign = TextAlign.Center,
         )
     } else {
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(FocoSpace.section))
     }
 }
 

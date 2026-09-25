@@ -49,7 +49,7 @@ fun SantoralLine(
                 role = Role.Button
                 onClick { open = !open; true }
             }
-            .padding(horizontal = 12.dp, vertical = 2.dp),
+            .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.hair),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -64,7 +64,7 @@ fun SantoralLine(
             ),
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(FocoSpace.hair))
         Text(
             text = day.name,
             style = TextStyle(

@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import com.foco.launcher.registry.GroupDrag
 import com.foco.launcher.registry.GroupSection
 import kotlin.math.abs
+import kotlin.math.hypot
 
 /**
  * A short hold arms a tile drag so a flick still scrolls the home list.
@@ -282,6 +283,44 @@ internal fun LayoutCoordinates.toDragBounds(): GroupDrag.Bounds {
     return GroupDrag.Bounds(bounds.left, bounds.top, bounds.right, bounds.bottom)
 }
 
+internal enum class DragPointerChoice { Wait, HoldStill, Arm, Drag, Yield, LongPress }
+
+/**
+ * A flick still leaves the tile so the pager or the list can move.
+ * A slow horizontal drift is consumed so the pager does not steal the hold.
+ * Past [DRAG_ARM_MS], movement becomes a group drag.
+ */
+internal fun dragPointerChoice(
+    elapsedMs: Long,
+    totalX: Float,
+    totalY: Float,
+    slop: Float,
+    longPressMs: Long,
+    armed: Boolean,
+    wantsLongPress: Boolean,
+): DragPointerChoice {
+    val distance = hypot(totalX.toDouble(), totalY.toDouble()).toFloat()
+    val wide = slop * 3f
+    if (armed) {
+        if (wantsLongPress && elapsedMs >= longPressMs && distance <= slop) {
+            return DragPointerChoice.LongPress
+        }
+        return if (distance > slop) DragPointerChoice.Drag else DragPointerChoice.HoldStill
+    }
+    if (elapsedMs >= DRAG_ARM_MS && distance <= wide) {
+        return if (distance > slop) DragPointerChoice.Drag else DragPointerChoice.Arm
+    }
+    if (distance > slop && elapsedMs < DRAG_ARM_MS) {
+        if (abs(totalY) > abs(totalX)) return DragPointerChoice.Yield
+        if (abs(totalX) > wide) return DragPointerChoice.Yield
+        return DragPointerChoice.HoldStill
+    }
+    if (wantsLongPress && elapsedMs >= longPressMs && distance <= wide) {
+        return DragPointerChoice.LongPress
+    }
+    return DragPointerChoice.Wait
+}
+
 internal fun Modifier.homeTileGesture(
     key: Any?,
     enabled: Boolean,
@@ -309,18 +348,38 @@ internal fun Modifier.homeTileGesture(
             }
             total += change.position - change.previousPosition
             val elapsed = change.uptimeMillis - down.uptimeMillis
-            if (!dragging) {
-                if (!armed && elapsed >= DRAG_ARM_MS && total.getDistance() <= slop) {
+            if (dragging) {
+                change.consume()
+                onDrag(change.position)
+                continue
+            }
+            when (
+                dragPointerChoice(
+                    elapsedMs = elapsed,
+                    totalX = total.x,
+                    totalY = total.y,
+                    slop = slop,
+                    longPressMs = longPress,
+                    armed = armed,
+                    wantsLongPress = onLongClick != null,
+                )
+            ) {
+                DragPointerChoice.Wait -> Unit
+                DragPointerChoice.HoldStill -> change.consume()
+                DragPointerChoice.Arm -> {
                     armed = true
+                    change.consume()
                 }
-                if (total.getDistance() > slop) {
-                    if (!armed) break
+                DragPointerChoice.Drag -> {
+                    armed = true
                     dragging = true
                     change.consume()
                     onDragStart(change.position)
-                } else if (onLongClick != null && elapsed >= longPress) {
+                }
+                DragPointerChoice.Yield -> break
+                DragPointerChoice.LongPress -> {
                     change.consume()
-                    onLongClick()
+                    onLongClick?.invoke()
                     while (true) {
                         val next = awaitPointerEvent()
                         val held = next.changes.firstOrNull { it.id == pointerId } ?: break
@@ -329,9 +388,6 @@ internal fun Modifier.homeTileGesture(
                     }
                     break
                 }
-            } else {
-                change.consume()
-                onDrag(change.position)
             }
         }
     }

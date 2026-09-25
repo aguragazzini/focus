@@ -25,6 +25,13 @@ data class LauncherPrefs(
     /** Text-first tiles. Default off so icons stay on. */
     val namesOnly: Boolean = false,
     /**
+     * Cancel every notification the listener can see. Not system Do Not Disturb.
+     * Unpausing stops new cancels and does not restore ones already removed.
+     */
+    val phonePaused: Boolean = false,
+    /** These packages do not launch, and the listener cancels their notifications. */
+    val pausedPackages: List<String> = emptyList(),
+    /**
      * Home pager. Empty means the default four pages (Reloj, Personal, Comida, Trabajo).
      * Unknown or all-hidden lists are restored by [HomePages.resolve], not here.
      */

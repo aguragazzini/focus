@@ -56,6 +56,8 @@ data class HomeUiState(
     val hasWorkProfile: Boolean = false,
     val workSectionPaused: Boolean = false,
     val notificationsPaused: Boolean = false,
+    val phonePaused: Boolean = false,
+    val pausedPackages: List<String> = emptyList(),
     val namesOnly: Boolean = false,
     val homePages: List<HomePageSpec> = HomePages.defaults(),
 )
@@ -124,6 +126,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun showQuietBlocked() {
         message.value = getApplication<Application>().getString(R.string.work_quiet_tap)
+    }
+
+    fun showAppPaused() {
+        message.value = getApplication<Application>().getString(R.string.app_paused_block)
     }
 
     fun clearMessage() {
@@ -250,6 +256,18 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setPhonePaused(paused: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setPhonePaused(paused)
+        }
+    }
+
+    fun setPackagePaused(packageName: String, paused: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setPackagePaused(packageName, paused)
+        }
+    }
+
     fun showCrossSectionHint() {
         message.value = getApplication<Application>().getString(R.string.drag_cross_hint)
     }
@@ -347,6 +365,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             hasWorkProfile = work.loaded && work.hasWorkProfile,
             workSectionPaused = snap.prefs.workSectionPaused,
             notificationsPaused = snap.prefs.notificationsPaused,
+            phonePaused = snap.prefs.phonePaused,
+            pausedPackages = snap.prefs.pausedPackages,
             namesOnly = snap.prefs.namesOnly,
             homePages = HomePages.resolve(snap.prefs.pages),
         )

@@ -10,6 +10,11 @@ package com.foco.launcher.notification
  * Personal: [notificationsPaused] cancels in-scope apps (allowlist does not save them).
  * Otherwise the allowlist filter runs only while [nlsFilterEnabled].
  *
+ * [phonePaused] and [pausedPackages] are stronger: they ask the listener to cancel
+ * every matching notification, including ones the quieter pauses spare. Android may
+ * repost a call, a foreground service, or a system notification the listener cannot
+ * keep down. Those cancels fail soft. This still does not write Do Not Disturb.
+ *
  * This is Foco's listener cancel path. It does not touch interruption filters,
  * notification-policy access, device policy, or system quiet mode.
  */
@@ -35,8 +40,12 @@ object NotificationPolicy {
         listenerGranted: Boolean = true,
         workSectionPaused: Boolean = false,
         notificationsPaused: Boolean = false,
+        phonePaused: Boolean = false,
+        pausedPackages: Set<String> = emptySet(),
     ): Boolean {
         if (!listenerGranted) return false
+        if (phonePaused) return true
+        if (facts.packageName in pausedPackages) return true
         if (isProtectedSystemOrOem(facts.packageName)) return false
         if (isCallAlarmMediaException(facts)) return false
         if (facts.isWorkOrOtherProfile) {

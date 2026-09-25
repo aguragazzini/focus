@@ -70,6 +70,7 @@ class SettingsActivity : ComponentActivity() {
                     onOpenWorkSettings = { LaunchController.openWorkProfileSettings(this) },
                     onWorkPaused = vm::setWorkSectionPaused,
                     onNotificationsPaused = vm::setNotificationsPaused,
+                    onPhonePaused = vm::setPhonePaused,
                     onNamesOnly = vm::setNamesOnly,
                     onEditHome = {
                         startActivity(LauncherActivity.editIntent(this))
