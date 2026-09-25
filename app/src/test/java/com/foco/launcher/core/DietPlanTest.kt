@@ -6,6 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
+import java.time.DayOfWeek
 import java.time.LocalDate
 
 class DietPlanTest {
@@ -62,5 +63,13 @@ class DietPlanTest {
         val weekend = DietPlan.resolve(extra, LocalDate.of(2026, 9, 26))
         assertEquals("Fin", weekend?.theme)
         assertEquals(listOf("Tres comidas."), weekend?.rules)
+    }
+
+    @Test
+    fun dateInWeekStaysInsideTheCordobaWeek() {
+        val friday = LocalDate.of(2026, 9, 25)
+        assertEquals(LocalDate.of(2026, 9, 21), DietPlan.dateInWeek(friday, DayOfWeek.MONDAY))
+        assertEquals(friday, DietPlan.dateInWeek(friday, DayOfWeek.FRIDAY))
+        assertEquals(LocalDate.of(2026, 9, 27), DietPlan.dateInWeek(friday, DayOfWeek.SUNDAY))
     }
 }

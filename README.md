@@ -3,7 +3,7 @@
 HOME launcher de lista blanca para Android. Kotlin + Jetpack Compose. Sin backend, sin Accessibility.
 
 Package: `com.foco.launcher`  
-Versión: `0.7.1` (versionCode 11)
+Versión: `0.8.0` (versionCode 14)
 
 Solo ves las apps que elegís. El resto no aparece.
 
@@ -21,7 +21,7 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 
 El APK de debug lo firma `signing/foco-debug.keystore` (alias `foco-debug`, passwords `android`). Esa clave se generó para el repo en 0.7.0. Si `adb install -r` responde `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, desinstalá la build anterior y volvé a instalar. A partir de esta clave, las builds de debug del repo se pisan entre sí.
 
-El santoral del inicio es el calendario universal del misal de 1962 (rúbricas de 1960), en `app/src/main/assets/santoral_1962.json`. La etiqueta en el home es «Santoral».
+El reloj muestra el misal de 1962 y el Novus Ordo, en `santoral_1962.json` y `santoral_novus.json`. Las etiquetas son «1962» y «Novus». El inicio son cuatro páginas: Reloj, Personal, Comida, Trabajo. Personal es la página de llegada.
 
 ```
 app/build/outputs/apk/debug/app-debug.apk
