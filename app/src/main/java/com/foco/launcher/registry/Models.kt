@@ -24,6 +24,11 @@ data class LauncherPrefs(
     val notificationsPaused: Boolean = false,
     /** Text-first tiles. Default off so icons stay on. */
     val namesOnly: Boolean = false,
+    /**
+     * Home pager. Empty means the default four pages (Reloj, Personal, Comida, Trabajo).
+     * Unknown or all-hidden lists are restored by [HomePages.resolve], not here.
+     */
+    val pages: List<HomePageSpec> = emptyList(),
 ) {
     /** Andrés: personal packages that may notify. Derived from home + allowNotif. */
     val notificationAllowlist: Set<String>

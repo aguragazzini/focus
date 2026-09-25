@@ -1,5 +1,7 @@
 # Home pages — 0.8.0
 
+0.9.0 keeps this layout as the fresh-install default and adds create, rename, reorder, hide, and delete. See `docs/foco-home-pages-v090.md`.
+
 The home is four horizontal pages. Swipe between them. The landing page is Personal.
 
 Order:

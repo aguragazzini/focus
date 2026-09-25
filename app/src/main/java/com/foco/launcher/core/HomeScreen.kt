@@ -91,6 +91,8 @@ import androidx.compose.ui.zIndex
 import com.foco.launcher.R
 import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.registry.AppGroup
+import com.foco.launcher.registry.HomePageSpec
+import com.foco.launcher.registry.HomePages
 import com.foco.launcher.registry.ArrangedSection
 import com.foco.launcher.registry.GroupDrag
 import com.foco.launcher.registry.GroupLayout
@@ -102,13 +104,6 @@ import com.foco.launcher.work.WorkApp
 import com.foco.launcher.work.WorkCatalogRules
 import com.foco.launcher.work.WorkSectionKind
 import kotlinx.coroutines.launch
-
-internal const val HOME_PAGE_CLOCK = 0
-internal const val HOME_PAGE_PERSONAL = 1
-internal const val HOME_PAGE_DIET = 2
-internal const val HOME_PAGE_WORK = 3
-internal const val HOME_PAGE_COUNT = 4
-internal const val HOME_LANDING_PAGE = HOME_PAGE_PERSONAL
 
 @Composable
 fun HomeLoading(modifier: Modifier = Modifier) {
@@ -163,6 +158,13 @@ fun HomeScreen(
     onOpenWorkSettings: () -> Unit,
     onQuietTap: () -> Unit,
     onMessageShown: () -> Unit,
+    requestEdit: Boolean = false,
+    onEditRequestConsumed: () -> Unit = {},
+    onCreatePage: (String, String) -> Unit = { _, _ -> },
+    onRenamePage: (String, String) -> Unit = { _, _ -> },
+    onMovePage: (String, Int) -> Unit = { _, _ -> },
+    onHidePage: (String, Boolean) -> Unit = { _, _ -> },
+    onDeletePage: (String) -> Unit = {},
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -172,6 +174,7 @@ fun HomeScreen(
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     var workQuery by rememberSaveable { mutableStateOf("") }
     var openedGroupId by remember { mutableStateOf<String?>(null) }
+    var editing by rememberSaveable { mutableStateOf(false) }
     val drag = remember { HomeDragState() }
     val density = LocalDensity.current
     val iconPx = with(density) { (if (state.namesOnly) 28.dp else 48.dp).toPx() }
@@ -271,6 +274,14 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(requestEdit) {
+        if (requestEdit) {
+            sheet = null
+            editing = true
+            onEditRequestConsumed()
+        }
+    }
+
     LaunchedEffect(state.message) {
         val msg = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(msg)
@@ -321,10 +332,26 @@ fun HomeScreen(
                 onRefreshWork = onRefreshWork,
             )
             val scope = rememberCoroutineScope()
-            val pagerState = rememberPagerState(initialPage = HOME_LANDING_PAGE) { HOME_PAGE_COUNT }
-            HomePagerCue(page = pagerState.currentPage) { index ->
-                scope.launch { pagerState.animateScrollToPage(index) }
+            val visible = HomePages.visible(state.homePages)
+            val landing = HomePages.landingIndex(visible)
+            val pagerState = rememberPagerState(
+                initialPage = landing.coerceIn(0, (visible.size - 1).coerceAtLeast(0)),
+            ) { visible.size.coerceAtLeast(1) }
+            LaunchedEffect(visible.size) {
+                val last = (visible.size - 1).coerceAtLeast(0)
+                if (pagerState.currentPage > last) pagerState.scrollToPage(last)
             }
+            val pageLabels = visible.map { pageLabel(it) }
+            HomePagerCue(
+                labels = pageLabels,
+                page = pagerState.currentPage.coerceIn(0, (pageLabels.size - 1).coerceAtLeast(0)),
+                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+                onEdit = {
+                    sheet = null
+                    editing = true
+                },
+            )
+            val bannerPageId = visible.firstOrNull { it.type == HomePages.TYPE_PERSONAL }?.id
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier
@@ -332,17 +359,23 @@ fun HomeScreen(
                     .fillMaxWidth(),
                 userScrollEnabled = drag.chrome == null,
                 verticalAlignment = Alignment.Top,
+                key = { index -> visible.getOrNull(index)?.id ?: index },
             ) { page ->
-                when (page) {
-                    HOME_PAGE_CLOCK -> ClockHomePage(
+                val spec = visible.getOrNull(page)
+                when (spec?.type) {
+                    HomePages.TYPE_CLOCK -> ClockHomePage(
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
                         onOpenSystemSettings = onOpenSystemSettings,
                     )
-                    HOME_PAGE_PERSONAL -> PersonalHomePage(
+                    HomePages.TYPE_PERSONAL -> PersonalHomePage(
                         state = state,
                         arranged = personalArranged,
                         drag = drag,
+                        pageKey = spec.id,
+                        title = spec.label,
+                        showBanners = spec.id == bannerPageId,
+                        showPause = true,
                         onAddApps = onAddApps,
                         onOpenSystemSettings = onOpenSystemSettings,
                         onChooseDefault = onChooseDefault,
@@ -361,7 +394,34 @@ fun HomeScreen(
                         onDrag = { window -> moveDrag(window) },
                         onDragEnd = { endDrag() },
                     )
-                    HOME_PAGE_DIET -> {
+                    HomePages.TYPE_APPS -> PersonalHomePage(
+                        state = state,
+                        arranged = personalArranged,
+                        drag = drag,
+                        pageKey = spec.id,
+                        title = spec.label,
+                        showBanners = false,
+                        showPause = false,
+                        titleFallback = R.string.home_page_apps,
+                        onAddApps = onAddApps,
+                        onOpenSystemSettings = onOpenSystemSettings,
+                        onChooseDefault = onChooseDefault,
+                        onOpenAvisos = onOpenAvisos,
+                        onNotificationsPaused = onNotificationsPaused,
+                        onLaunch = onLaunch,
+                        onOpenGroup = { openedGroupId = it },
+                        onPersonalSheet = { sheet = HomeSheet.Personal(it) },
+                        onGroupSheet = {
+                            openedGroupId = null
+                            sheet = HomeSheet.Open(it)
+                        },
+                        onDragStart = { cell, window ->
+                            startDrag(GroupSection.PERSONAL, cell, null, emptySet(), window)
+                        },
+                        onDrag = { window -> moveDrag(window) },
+                        onDragEnd = { endDrag() },
+                    )
+                    HomePages.TYPE_DIET -> {
                         val meals = remember(context) {
                             DietPlan.peek() ?: runCatching {
                                 context.assets.open("plan_ragazzini.json").bufferedReader().use { reader ->
@@ -374,8 +434,10 @@ fun HomeScreen(
                             onOpenSystemSettings = onOpenSystemSettings,
                         )
                     }
-                    else -> WorkHomePage(
+                    HomePages.TYPE_WORK -> WorkHomePage(
                         state = state,
+                        pageKey = spec.id,
+                        title = spec.label,
                         arranged = workArranged,
                         visible = workVisible,
                         searchOpen = searchOpen,
@@ -401,6 +463,7 @@ fun HomeScreen(
                         onDrag = { window -> moveDrag(window) },
                         onDragEnd = { endDrag() },
                     )
+                    else -> Unit
                 }
             }
         }
@@ -635,8 +698,206 @@ fun HomeScreen(
             },
         )
     }
+
+    if (editing) {
+        HomeEditSheet(
+            pages = state.homePages,
+            onRename = onRenamePage,
+            onMove = onMovePage,
+            onHide = onHidePage,
+            onDelete = onDeletePage,
+            onCreate = onCreatePage,
+            onDismiss = { editing = false },
+        )
+    }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeEditSheet(
+    pages: List<HomePageSpec>,
+    onRename: (String, String) -> Unit,
+    onMove: (String, Int) -> Unit,
+    onHide: (String, Boolean) -> Unit,
+    onDelete: (String) -> Unit,
+    onCreate: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var picking by remember { mutableStateOf(false) }
+    var renameId by remember { mutableStateOf<String?>(null) }
+    val renameTarget = pages.find { it.id == renameId }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = FocoInkElevated,
+        contentColor = FocoPaper,
+        tonalElevation = 0.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = FocoPaperDim) },
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, bottom = 28.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.home_edit),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FocoPaper,
+                )
+                FocoTextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.home_edit_done))
+                }
+            }
+            val visibleCount = pages.count { !it.hidden }
+            pages.forEachIndexed { index, page ->
+                val name = pageLabel(page)
+                Text(
+                    text = name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { renameId = page.id }
+                        .padding(top = 14.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (page.hidden) FocoPaperDim else FocoPaper,
+                )
+                Text(
+                    text = if (page.hidden) {
+                        stringResource(R.string.home_edit_hidden)
+                    } else {
+                        pageLabel(page.copy(label = ""))
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FocoPaperDim,
+                )
+                Row {
+                    if (index > 0) {
+                        FocoTextButton(onClick = { onMove(page.id, -1) }) {
+                            Text(stringResource(R.string.home_edit_up))
+                        }
+                    }
+                    if (index < pages.lastIndex) {
+                        FocoTextButton(onClick = { onMove(page.id, 1) }) {
+                            Text(stringResource(R.string.home_edit_down))
+                        }
+                    }
+                    if (page.hidden || visibleCount > 1) {
+                        FocoTextButton(onClick = { onHide(page.id, !page.hidden) }) {
+                            Text(
+                                stringResource(
+                                    if (page.hidden) R.string.home_edit_show else R.string.home_edit_hide,
+                                ),
+                            )
+                        }
+                    }
+                    if (HomePages.canDelete(pages, page.id)) {
+                        FocoTextButton(onClick = { onDelete(page.id) }) {
+                            Text(stringResource(R.string.home_edit_delete))
+                        }
+                    }
+                }
+            }
+            if (!picking && pages.size < HomePages.MAX) {
+                FocoTextButton(onClick = { picking = true }) {
+                    Text(stringResource(R.string.home_edit_add))
+                }
+            }
+            if (picking) {
+                HomePageTypePicker(
+                    onPick = { type, label ->
+                        picking = false
+                        onCreate(type, label)
+                    },
+                )
+            }
+        }
+    }
+    val naming = renameTarget
+    if (naming != null) {
+        HomePageNameDialog(
+            initial = pageLabel(naming),
+            onDismiss = { renameId = null },
+            onConfirm = { raw ->
+                onRename(naming.id, raw)
+                renameId = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun HomePageTypePicker(onPick: (String, String) -> Unit) {
+    val types = listOf(
+        HomePages.TYPE_CLOCK to R.string.page_clock,
+        HomePages.TYPE_PERSONAL to R.string.section_personal,
+        HomePages.TYPE_APPS to R.string.home_page_apps,
+        HomePages.TYPE_DIET to R.string.page_diet,
+        HomePages.TYPE_WORK to R.string.section_work,
+    )
+    types.forEach { (type, labelRes) ->
+        val label = stringResource(labelRes)
+        Text(
+            text = label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onPick(type, label) }
+                .padding(vertical = 12.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            color = FocoPaper,
+        )
+    }
+}
+
+@Composable
+private fun HomePageNameDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var raw by remember { mutableStateOf(initial) }
+    val clean = raw.trim().replace(Regex("\\s+"), " ").take(GroupMutations.NAME_MAX)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        text = {
+            OutlinedTextField(
+                value = raw,
+                onValueChange = { raw = it },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = FocoPaper),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onConfirm(clean) }),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = FocoPaper,
+                    unfocusedTextColor = FocoPaper,
+                    focusedBorderColor = FocoPaperDim,
+                    unfocusedBorderColor = FocoLine,
+                    cursorColor = FocoPaper,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                ),
+            )
+        },
+        confirmButton = {
+            FocoTextButton(onClick = { onConfirm(clean) }) {
+                Text(stringResource(R.string.home_edit_done))
+            }
+        },
+        dismissButton = {
+            FocoTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.group_cancel))
+            }
+        },
+    )
 }
 
 @Composable
@@ -704,6 +965,11 @@ private fun PersonalHomePage(
     state: HomeUiState,
     arranged: ArrangedSection,
     drag: HomeDragState,
+    pageKey: String,
+    title: String,
+    showBanners: Boolean,
+    showPause: Boolean,
+    titleFallback: Int = R.string.section_personal,
     onAddApps: () -> Unit,
     onOpenSystemSettings: () -> Unit,
     onChooseDefault: () -> Unit,
@@ -718,36 +984,40 @@ private fun PersonalHomePage(
     onDragEnd: () -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item(key = "banner") {
-            when (state.banner) {
-                HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
-                HomeBanner.Nls -> NlsOffBanner(
-                    disconnected = state.nlsAttention == NlsRecovery.Attention.Disconnected,
-                    onOpenAvisos = onOpenAvisos,
-                )
-                HomeBanner.None -> Unit
-            }
-            if (state.banner != HomeBanner.None) {
-                Spacer(Modifier.height(16.dp))
+        if (showBanners) {
+            item(key = "$pageKey:banner") {
+                when (state.banner) {
+                    HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
+                    HomeBanner.Nls -> NlsOffBanner(
+                        disconnected = state.nlsAttention == NlsRecovery.Attention.Disconnected,
+                        onOpenAvisos = onOpenAvisos,
+                    )
+                    HomeBanner.None -> Unit
+                }
+                if (state.banner != HomeBanner.None) {
+                    Spacer(Modifier.height(16.dp))
+                }
             }
         }
-        item(key = "personal-header") {
+        item(key = "$pageKey:personal-header") {
             Spacer(Modifier.height(8.dp))
             SectionTitle(
-                text = stringResource(R.string.section_personal),
+                text = title.ifBlank { stringResource(titleFallback) },
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
-            Spacer(Modifier.height(8.dp))
-            PagePause(
-                paused = state.notificationsPaused,
-                idle = stringResource(R.string.nls_pause),
-                active = stringResource(R.string.nls_paused_chip),
-                onClick = { onNotificationsPaused(!state.notificationsPaused) },
-            )
+            if (showPause) {
+                Spacer(Modifier.height(8.dp))
+                PagePause(
+                    paused = state.notificationsPaused,
+                    idle = stringResource(R.string.nls_pause),
+                    active = stringResource(R.string.nls_paused_chip),
+                    onClick = { onNotificationsPaused(!state.notificationsPaused) },
+                )
+            }
             Spacer(Modifier.height(16.dp))
         }
         if (arranged.groups.isEmpty() && arranged.looseIds.isEmpty()) {
-            item(key = "personal-empty") {
+            item(key = "$pageKey:personal-empty") {
                 PersonalEmptyInline(
                     onAddApps = onAddApps,
                     onOpenSystemSettings = onOpenSystemSettings,
@@ -765,9 +1035,9 @@ private fun PersonalHomePage(
             ).chunked(4)
             items(
                 items = rows,
-                key = { row -> "p:" + row.joinToString("|") { it.key } },
+                key = { row -> "$pageKey:p:" + row.joinToString("|") { it.key } },
             ) { row ->
-                val rowKey = "p:" + row.joinToString("|") { it.key }
+                val rowKey = "$pageKey:p:" + row.joinToString("|") { it.key }
                 AppRow(
                     cells = row,
                     section = GroupSection.PERSONAL,
@@ -798,11 +1068,11 @@ private fun PersonalHomePage(
                     onDragEnd = onDragEnd,
                 )
             }
-            item(key = "personal-pad") {
-                GridPad(drag = drag, section = GroupSection.PERSONAL, rowKey = "personal-pad")
+            item(key = "$pageKey:personal-pad") {
+                GridPad(drag = drag, section = GroupSection.PERSONAL, rowKey = "$pageKey:personal-pad")
             }
         }
-        item(key = "escape") {
+        item(key = "$pageKey:escape") {
             EscapePad(onOpenSystemSettings)
         }
     }
@@ -811,6 +1081,8 @@ private fun PersonalHomePage(
 @Composable
 private fun WorkHomePage(
     state: HomeUiState,
+    pageKey: String,
+    title: String,
     arranged: ArrangedSection,
     visible: List<WorkApp>,
     searchOpen: Boolean,
@@ -833,10 +1105,10 @@ private fun WorkHomePage(
 ) {
     val focoPaused = state.workSectionPaused && state.hasWorkProfile
     LazyColumn(modifier = Modifier.fillMaxSize()) {
-        item(key = "work-header") {
+        item(key = "$pageKey:work-header") {
             Spacer(Modifier.height(8.dp))
             SectionTitle(
-                text = stringResource(R.string.section_work),
+                text = title.ifBlank { stringResource(R.string.section_work) },
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
             if (state.hasWorkProfile) {
@@ -851,7 +1123,7 @@ private fun WorkHomePage(
             Spacer(Modifier.height(12.dp))
         }
         if (focoPaused) {
-            item(key = "work-paused") {
+            item(key = "$pageKey:work-paused") {
                 Text(
                     text = stringResource(R.string.work_pause_status),
                     style = MaterialTheme.typography.bodyLarge,
@@ -860,7 +1132,7 @@ private fun WorkHomePage(
                 )
             }
         } else if (state.workKind == WorkSectionKind.Hidden) {
-            item(key = "work-absent") {
+            item(key = "$pageKey:work-absent") {
                 Text(
                     text = stringResource(R.string.settings_work_none),
                     style = MaterialTheme.typography.bodyLarge,
@@ -869,7 +1141,7 @@ private fun WorkHomePage(
                 )
             }
         } else {
-            item(key = "work-tools") {
+            item(key = "$pageKey:work-tools") {
                 WorkHeader(
                     kind = state.workKind,
                     query = query,
@@ -882,7 +1154,7 @@ private fun WorkHomePage(
             }
             when {
                 WorkCatalogRules.showErrorCopy(state.workKind) -> {
-                    item(key = "work-error") {
+                    item(key = "$pageKey:work-error") {
                         Column(Modifier.padding(horizontal = 24.dp)) {
                             Text(
                                 text = stringResource(R.string.work_load_error),
@@ -896,7 +1168,7 @@ private fun WorkHomePage(
                     }
                 }
                 WorkCatalogRules.showWorkEmptyCopy(state.workKind) -> {
-                    item(key = "work-empty") {
+                    item(key = "$pageKey:work-empty") {
                         Text(
                             text = stringResource(R.string.work_empty),
                             style = MaterialTheme.typography.bodyLarge,
@@ -906,7 +1178,7 @@ private fun WorkHomePage(
                     }
                 }
                 searchOpen && query.isNotBlank() && visible.isEmpty() -> {
-                    item(key = "work-search-empty") {
+                    item(key = "$pageKey:work-search-empty") {
                         Text(
                             text = stringResource(R.string.work_search_empty),
                             style = MaterialTheme.typography.bodyLarge,
@@ -944,9 +1216,9 @@ private fun WorkHomePage(
                     val rows = cells.chunked(4)
                     items(
                         items = rows,
-                        key = { row -> "w:" + row.joinToString("|") { it.key } },
+                        key = { row -> "$pageKey:w:" + row.joinToString("|") { it.key } },
                     ) { row ->
-                        val rowKey = "w:" + row.joinToString("|") { it.key }
+                        val rowKey = "$pageKey:w:" + row.joinToString("|") { it.key }
                         AppRow(
                             cells = row,
                             section = GroupSection.WORK,
@@ -990,27 +1262,42 @@ private fun WorkHomePage(
                         )
                     }
                     if (!searching) {
-                        item(key = "work-pad") {
-                            GridPad(drag = drag, section = GroupSection.WORK, rowKey = "work-pad")
+                        item(key = "$pageKey:work-pad") {
+                            GridPad(drag = drag, section = GroupSection.WORK, rowKey = "$pageKey:work-pad")
                         }
                     }
                 }
             }
         }
-        item(key = "escape") {
+        item(key = "$pageKey:escape") {
             EscapePad(onOpenSystemSettings)
         }
     }
 }
 
 @Composable
-private fun HomePagerCue(page: Int, onSelect: (Int) -> Unit) {
-    val labels = listOf(
-        R.string.page_clock,
-        R.string.section_personal,
-        R.string.page_diet,
-        R.string.section_work,
+private fun pageLabel(page: HomePageSpec): String {
+    if (page.label.isNotBlank()) return page.label
+    return stringResource(
+        when (page.type) {
+            HomePages.TYPE_CLOCK -> R.string.page_clock
+            HomePages.TYPE_PERSONAL -> R.string.section_personal
+            HomePages.TYPE_DIET -> R.string.page_diet
+            HomePages.TYPE_WORK -> R.string.section_work
+            else -> R.string.home_page_apps
+        },
     )
+}
+
+@Composable
+private fun HomePagerCue(
+    labels: List<String>,
+    page: Int,
+    onSelect: (Int) -> Unit,
+    onEdit: () -> Unit,
+) {
+    val safePage = page.coerceIn(0, (labels.size - 1).coerceAtLeast(0))
+    val current = labels.getOrNull(safePage).orEmpty()
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1018,9 +1305,8 @@ private fun HomePagerCue(page: Int, onSelect: (Int) -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Row(horizontalArrangement = Arrangement.Center) {
-            labels.forEachIndexed { index, labelRes ->
-                val label = stringResource(labelRes)
-                val selected = index == page
+            labels.forEachIndexed { index, label ->
+                val selected = index == safePage
                 Box(
                     modifier = Modifier
                         .size(28.dp)
@@ -1038,7 +1324,11 @@ private fun HomePagerCue(page: Int, onSelect: (Int) -> Unit) {
             }
         }
         Text(
-            text = stringResource(labels[page.coerceIn(labels.indices)]),
+            text = current,
+            modifier = Modifier.combinedClickable(
+                onClick = {},
+                onLongClick = onEdit,
+            ),
             style = MaterialTheme.typography.bodyMedium,
             color = FocoPaperDim,
             fontSize = 11.sp,

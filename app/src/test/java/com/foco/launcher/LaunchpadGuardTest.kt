@@ -1,11 +1,6 @@
 package com.foco.launcher
 
-import com.foco.launcher.core.HOME_LANDING_PAGE
-import com.foco.launcher.core.HOME_PAGE_CLOCK
-import com.foco.launcher.core.HOME_PAGE_COUNT
-import com.foco.launcher.core.HOME_PAGE_DIET
-import com.foco.launcher.core.HOME_PAGE_PERSONAL
-import com.foco.launcher.core.HOME_PAGE_WORK
+import com.foco.launcher.registry.HomePages
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -58,9 +53,10 @@ class LaunchpadGuardTest {
     @Test
     fun homeIsClockThenPersonalThenWorkWithoutStripChrome() {
         val src = File("src/main/java/com/foco/launcher/core/HomeScreen.kt").readText()
-        val clock = src.indexOf("HomeClock")
-        val personal = src.indexOf("section_personal")
-        val work = src.indexOf("section_work")
+        val pages = src.substringAfter("fun ClockHomePage")
+        val clock = pages.indexOf("HomeClock")
+        val personal = pages.indexOf("section_personal")
+        val work = pages.indexOf("section_work")
         assertTrue(clock >= 0 && personal > clock && work > personal)
         assertFalse(src.contains("StatusStrip"))
         assertFalse(src.contains("work_sub"))
@@ -76,13 +72,14 @@ class LaunchpadGuardTest {
         assertTrue(src.contains("HorizontalPager"))
         assertTrue(src.contains("santoral_novus.json"))
         assertTrue(src.contains("plan_ragazzini.json"))
-        assertEquals(0, HOME_PAGE_CLOCK)
-        assertEquals(1, HOME_PAGE_PERSONAL)
-        assertEquals(2, HOME_PAGE_DIET)
-        assertEquals(3, HOME_PAGE_WORK)
-        assertEquals(4, HOME_PAGE_COUNT)
-        assertEquals(HOME_PAGE_PERSONAL, HOME_LANDING_PAGE)
-        assertTrue(src.contains("initialPage = HOME_LANDING_PAGE"))
+        assertTrue(src.contains("HomePages.landingIndex"))
+        assertTrue(src.contains("home_edit"))
+        val defaults = HomePages.defaults()
+        assertEquals(
+            listOf(HomePages.TYPE_CLOCK, HomePages.TYPE_PERSONAL, HomePages.TYPE_DIET, HomePages.TYPE_WORK),
+            defaults.map { it.type },
+        )
+        assertEquals(1, HomePages.landingIndex(HomePages.visible(defaults)))
         val clockFn = src.substringAfter("fun ClockHomePage").substringBefore("fun PersonalHomePage")
         assertTrue(clockFn.contains("HomeClock"))
         assertTrue(clockFn.contains("santoral_1962.json"))

@@ -87,6 +87,7 @@ fun SettingsHost(
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
+    onEditHome: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -103,6 +104,7 @@ fun SettingsHost(
             onWorkPaused = onWorkPaused,
             onNotificationsPaused = onNotificationsPaused,
             onNamesOnly = onNamesOnly,
+            onEditHome = onEditHome,
         )
         SettingsDest.Edit -> EditAppsScreen(
             state = state,
@@ -160,6 +162,7 @@ private fun SettingsMain(
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
+    onEditHome: () -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -208,6 +211,11 @@ private fun SettingsMain(
                         subtitle = stringResource(R.string.look_no_icons_sub),
                         checked = state.namesOnly,
                         onCheckedChange = onNamesOnly,
+                    )
+                    SettingsRow(
+                        title = stringResource(R.string.settings_home),
+                        subtitle = stringResource(R.string.settings_home_sub),
+                        onClick = onEditHome,
                     )
                 }
                 HorizontalDivider()

@@ -13,6 +13,8 @@ import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.registry.AppGroup
 import com.foco.launcher.registry.GroupMutations
 import com.foco.launcher.registry.GroupSection
+import com.foco.launcher.registry.HomePageSpec
+import com.foco.launcher.registry.HomePages
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.WhitelistMutations
@@ -55,6 +57,7 @@ data class HomeUiState(
     val workSectionPaused: Boolean = false,
     val notificationsPaused: Boolean = false,
     val namesOnly: Boolean = false,
+    val homePages: List<HomePageSpec> = HomePages.defaults(),
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -345,7 +348,40 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             workSectionPaused = snap.prefs.workSectionPaused,
             notificationsPaused = snap.prefs.notificationsPaused,
             namesOnly = snap.prefs.namesOnly,
+            homePages = HomePages.resolve(snap.prefs.pages),
         )
+    }
+
+    fun createHomePage(type: String, label: String) {
+        editPages { pages ->
+            HomePages.create(pages, type, label, UUID.randomUUID().toString())
+        }
+    }
+
+    fun renameHomePage(id: String, label: String) {
+        editPages { HomePages.rename(it, id, label) }
+    }
+
+    fun moveHomePage(id: String, delta: Int) {
+        editPages { HomePages.move(it, id, delta) }
+    }
+
+    fun setHomePageHidden(id: String, hidden: Boolean) {
+        editPages { HomePages.setHidden(it, id, hidden) }
+    }
+
+    fun deleteHomePage(id: String) {
+        editPages { HomePages.delete(it, id) }
+    }
+
+    private fun editPages(transform: (List<HomePageSpec>) -> List<HomePageSpec>) {
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val current = HomePages.resolve(prefs.pages)
+                val next = transform(current)
+                if (next == current && prefs.pages == current) prefs else prefs.copy(pages = next)
+            }
+        }
     }
 
     private data class StartupSnap(

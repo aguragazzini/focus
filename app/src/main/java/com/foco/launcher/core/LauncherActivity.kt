@@ -8,8 +8,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import android.content.Intent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -22,8 +25,10 @@ import com.foco.launcher.work.WorkApp
 
 class LauncherActivity : ComponentActivity() {
     private lateinit var vm: HomeViewModel
+    private var requestEdit by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        requestEdit = intent.getBooleanExtra(EXTRA_EDIT_HOME, false)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as FocoApp
@@ -102,14 +107,46 @@ class LauncherActivity : ComponentActivity() {
                     },
                     onQuietTap = vm::showQuietBlocked,
                     onMessageShown = vm::clearMessage,
+                    requestEdit = requestEdit,
+                    onEditRequestConsumed = {
+                        requestEdit = false
+                        intent.removeExtra(EXTRA_EDIT_HOME)
+                    },
+                    onCreatePage = vm::createHomePage,
+                    onRenamePage = vm::renameHomePage,
+                    onMovePage = vm::moveHomePage,
+                    onHidePage = vm::setHomePageHidden,
+                    onDeletePage = vm::deleteHomePage,
                 )
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_EDIT_HOME, false)) {
+            requestEdit = true
         }
     }
 
     override fun onResume() {
         super.onResume()
         if (::vm.isInitialized) vm.onResume()
+    }
+
+    companion object {
+        const val EXTRA_EDIT_HOME = "edit_home"
+
+        fun editIntent(context: android.content.Context): Intent {
+            return Intent(context, LauncherActivity::class.java)
+                .putExtra(EXTRA_EDIT_HOME, true)
+                .addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                )
+        }
     }
 
     private fun openFocoSettings(dest: String) {
