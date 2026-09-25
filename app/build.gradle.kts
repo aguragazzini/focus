@@ -13,8 +13,20 @@ android {
         applicationId = "com.foco.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.6.0"
+        versionCode = 13
+        versionName = "0.7.2"
+    }
+
+    signingConfigs {
+        // Shared debug key so later builds from this repo install over each other.
+        // It is not the historical machine-local ~/.android/debug.keystore, so an
+        // APK signed before 0.7.0 still needs an uninstall before this one.
+        getByName("debug") {
+            storeFile = rootProject.file("signing/foco-debug.keystore")
+            storePassword = "android"
+            keyAlias = "foco-debug"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {

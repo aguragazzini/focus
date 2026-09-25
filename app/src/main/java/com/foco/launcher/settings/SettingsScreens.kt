@@ -32,6 +32,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -43,9 +45,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.foco.launcher.R
 import com.foco.launcher.core.FocoInk
+import com.foco.launcher.core.FocoLine
 import com.foco.launcher.core.FocoPaper
 import com.foco.launcher.core.FocoPaperDim
 import com.foco.launcher.core.FocoPrimaryButton
@@ -80,6 +84,9 @@ fun SettingsHost(
     onNlsMessageShown: () -> Unit,
     onRefreshWork: () -> Unit,
     onOpenWorkSettings: () -> Unit,
+    onWorkPaused: (Boolean) -> Unit,
+    onNotificationsPaused: (Boolean) -> Unit,
+    onNamesOnly: (Boolean) -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -93,6 +100,9 @@ fun SettingsHost(
             onOpenSystemSettings = onOpenSystemSettings,
             onRefreshWork = onRefreshWork,
             onOpenWorkSettings = onOpenWorkSettings,
+            onWorkPaused = onWorkPaused,
+            onNotificationsPaused = onNotificationsPaused,
+            onNamesOnly = onNamesOnly,
         )
         SettingsDest.Edit -> EditAppsScreen(
             state = state,
@@ -147,6 +157,9 @@ private fun SettingsMain(
     onOpenSystemSettings: () -> Unit,
     onRefreshWork: () -> Unit,
     onOpenWorkSettings: () -> Unit,
+    onWorkPaused: (Boolean) -> Unit,
+    onNotificationsPaused: (Boolean) -> Unit,
+    onNamesOnly: (Boolean) -> Unit,
 ) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -183,6 +196,43 @@ private fun SettingsMain(
                     onClick = onOpenEdit,
                 )
                 HorizontalDivider()
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_look),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.look_no_icons),
+                        subtitle = stringResource(R.string.look_no_icons_sub),
+                        checked = state.namesOnly,
+                        onCheckedChange = onNamesOnly,
+                    )
+                }
+                HorizontalDivider()
+                Column(modifier = Modifier.padding(top = 8.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_avisos_block),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        modifier = Modifier.padding(horizontal = 20.dp),
+                    )
+                    Text(
+                        text = stringResource(
+                            if (state.notificationsPaused) R.string.nls_pause_status else R.string.nls_list_status,
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FocoPaperDim,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.nls_pause),
+                        subtitle = stringResource(R.string.nls_pause_sub),
+                        checked = state.notificationsPaused,
+                        onCheckedChange = onNotificationsPaused,
+                    )
+                }
                 SettingsRow(
                     title = stringResource(R.string.settings_notifications),
                     subtitle = stringResource(notificationsSubtitle(state)),
@@ -193,6 +243,7 @@ private fun SettingsMain(
                     state = state,
                     onRefresh = onRefreshWork,
                     onOpenWorkSettings = onOpenWorkSettings,
+                    onWorkPaused = onWorkPaused,
                 )
                 HorizontalDivider()
                 SettingsRow(
@@ -230,6 +281,16 @@ private fun SettingsMain(
                         text = stringResource(R.string.settings_about_body),
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_pause_note),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_about_calendar),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         }
@@ -241,6 +302,7 @@ private fun WorkProfileBlock(
     state: SettingsUiState,
     onRefresh: () -> Unit,
     onOpenWorkSettings: () -> Unit,
+    onWorkPaused: (Boolean) -> Unit,
 ) {
     val status = WorkCatalogRules.settingsStatus(
         loaded = state.workLoaded,
@@ -249,12 +311,13 @@ private fun WorkProfileBlock(
         loadFailed = state.workFailed,
         activityCount = state.workCount,
     )
-    val subtitle = when (status) {
-        WorkSettingsStatus.Unknown -> stringResource(R.string.strip_work_unknown)
-        WorkSettingsStatus.Absent -> stringResource(R.string.settings_work_off)
-        WorkSettingsStatus.Visible -> stringResource(R.string.settings_work_on)
-        WorkSettingsStatus.Quiet -> stringResource(R.string.settings_work_quiet)
-        WorkSettingsStatus.Failed -> stringResource(R.string.work_load_error)
+    val subtitle = when {
+        state.workProfile && state.workSectionPaused -> stringResource(R.string.work_pause_status)
+        status == WorkSettingsStatus.Unknown -> stringResource(R.string.strip_work_unknown)
+        status == WorkSettingsStatus.Absent -> stringResource(R.string.settings_work_off)
+        status == WorkSettingsStatus.Visible -> stringResource(R.string.settings_work_on)
+        status == WorkSettingsStatus.Quiet -> stringResource(R.string.settings_work_quiet)
+        else -> stringResource(R.string.work_load_error)
     }
     val body = when (status) {
         WorkSettingsStatus.Absent -> stringResource(R.string.settings_work_none)
@@ -277,6 +340,23 @@ private fun WorkProfileBlock(
         if (body != null) {
             Spacer(Modifier.height(8.dp))
             Text(text = body, style = MaterialTheme.typography.bodyMedium, color = FocoPaperDim)
+        }
+        if (state.workProfile && !state.workSectionPaused && status != WorkSettingsStatus.Visible) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.work_visible_status),
+                style = MaterialTheme.typography.bodyMedium,
+                color = FocoPaperDim,
+            )
+        }
+        if (state.workProfile) {
+            SettingsSwitchRow(
+                title = stringResource(R.string.work_pause),
+                subtitle = stringResource(R.string.work_pause_sub),
+                checked = state.workSectionPaused,
+                onCheckedChange = onWorkPaused,
+                horizontalInset = 0.dp,
+            )
         }
         if (status == WorkSettingsStatus.Visible || status == WorkSettingsStatus.Quiet) {
             Spacer(Modifier.height(8.dp))
@@ -313,6 +393,44 @@ private fun notificationsSubtitle(state: SettingsUiState): Int {
         !state.nlsGranted -> R.string.nls_settings_need_grant
         state.nlsFilterEnabled && !state.nlsConnected -> R.string.nls_settings_disconnected
         else -> R.string.settings_notifications_sub
+    }
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    horizontalInset: Dp = 20.dp,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = horizontalInset, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onBackground,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(text = subtitle, style = MaterialTheme.typography.bodyMedium)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = FocoInk,
+                checkedTrackColor = FocoPaper,
+                uncheckedThumbColor = FocoPaperDim,
+                uncheckedTrackColor = FocoLine,
+                uncheckedBorderColor = FocoLine,
+            ),
+        )
     }
 }
 

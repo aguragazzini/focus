@@ -21,7 +21,12 @@ class LaunchpadGuardTest {
     @Test
     fun launcherDoesNotPauseOrAdministerWork() {
         val root = File("src/main/java")
-        val banned = listOf("DevicePolicyManager", "requestQuietModeEnabled", "QUERY_ALL_PACKAGES")
+        val banned = listOf(
+            "DevicePolicyManager",
+            "requestQuietModeEnabled",
+            "QUERY_ALL_PACKAGES",
+            "setInterruptionFilter",
+        )
         val hits = root.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
             .flatMap { file ->
@@ -55,8 +60,18 @@ class LaunchpadGuardTest {
         assertFalse(src.contains("personal_edit"))
         assertFalse(src.contains("Icons.Outlined.Refresh"))
         assertFalse(src.contains("AppWidgetHost"))
+        assertTrue(src.contains("santoral_1962.json"))
+        assertTrue(src.contains("SantoralLine"))
+        assertFalse(src.contains("open-meteo"))
+        assertFalse(src.contains("LocalTemperature"))
         assertTrue(src.contains("home_empty"))
         assertTrue(src.contains("home_add"))
+        val clockUi = File("src/main/java/com/foco/launcher/core/HomeClock.kt").readText()
+        val underDate = clockUi.indexOf("underDate(day)")
+        val glanceText = clockUi.indexOf("text = glance")
+        assertTrue(underDate >= 0 && glanceText > underDate)
+        assertFalse(clockUi.contains("http"))
+        assertFalse(clockUi.contains("weather"))
         val clockSrc = File("src/main/java/com/foco/launcher/core/HomeClockFormat.kt").readText()
         assertFalse(clockSrc.contains("http"))
         assertFalse(clockSrc.contains("weather"))

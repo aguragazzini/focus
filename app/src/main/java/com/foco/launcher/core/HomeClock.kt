@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,7 +29,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.foco.launcher.R
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 @Composable
@@ -39,8 +44,11 @@ fun HomeClock(
     nowMillis: () -> Long = System::currentTimeMillis,
     zone: ZoneId = ZoneId.systemDefault(),
     readGlance: () -> String? = { null },
+    underDate: @Composable (LocalDate) -> Unit = {},
+    belowGlance: @Composable () -> Unit = {},
 ) {
     var now by remember { mutableLongStateOf(nowMillis()) }
+    var glance by remember { mutableStateOf(HomeGlance.peek()?.trim()?.takeIf { it.isNotEmpty() }) }
     LaunchedEffect(zone) {
         while (true) {
             val current = nowMillis()
@@ -50,9 +58,15 @@ fun HomeClock(
             delay(wait.coerceIn(250L, 60_000L))
         }
     }
+    LaunchedEffect(now, zone) {
+        val line = withContext(Dispatchers.Default) {
+            readGlance()?.trim()?.takeIf { it.isNotEmpty() }
+        }
+        if (line != glance) glance = line
+    }
     val time = HomeClockFormat.time(now, zone)
     val date = HomeClockFormat.date(now, zone)
-    val glance = readGlance()
+    val day = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
     val timeCd = stringResource(R.string.clock_time_cd, time)
     val dateCd = stringResource(R.string.clock_date_cd, date)
     Column(
@@ -98,10 +112,12 @@ fun HomeClock(
             ),
             textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.height(8.dp))
+        underDate(day)
         if (!glance.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text = glance,
+                text = glance.orEmpty(),
                 modifier = Modifier.padding(horizontal = 12.dp),
                 style = TextStyle(
                     fontFamily = FontFamily.SansSerif,
@@ -113,5 +129,6 @@ fun HomeClock(
                 textAlign = TextAlign.Center,
             )
         }
+        belowGlance()
     }
 }

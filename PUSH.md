@@ -53,7 +53,7 @@ After that, prefer normal `git push github main`.
 
 Already in `.gitignore` (verified, none of these are tracked):
 
-- `*.apk` `*.jks` `*.keystore`
+- `*.apk` `*.jks` and release keystores. `signing/foco-debug.keystore` is the shared debug key and is tracked.
 - `secrets.properties` `local.properties` `.env*` `google-services.json`
 
 APKs live in the agent Artifacts panel, not in git. See `dist/TRANSFER.md`.

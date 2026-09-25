@@ -82,6 +82,116 @@ object GroupMutations {
     }
 
     /**
+     * ES-AR default folder label. Two app labels when we have them, otherwise
+     * `Grupo`, `Grupo 2`, …
+     */
+    fun suggestedName(
+        groups: List<AppGroup>,
+        section: GroupSection,
+        labelFirst: String,
+        labelSecond: String,
+    ): String {
+        val joined = listOf(labelFirst, labelSecond)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .joinToString(" ")
+        val normalized = normalizeName(joined)
+        if (normalized != null) return normalized
+        val used = groups.filter { it.section == section }.map { it.name }.toSet()
+        var index = 1
+        while (index < 1000) {
+            val candidate = if (index == 1) "Grupo" else "Grupo $index"
+            if (candidate !in used) return candidate
+            index++
+        }
+        return "Grupo"
+    }
+
+    /**
+     * Drag app [draggedId] onto app [targetId] in the same section.
+     * If the target already lives in a folder, the dragged app joins it.
+     * Otherwise a new folder holds the target, then the dragged app.
+     * A folder left with a single app by this drag dissolves. The whitelist
+     * and the work catalog are not edited.
+     */
+    fun placeOnApp(
+        groups: List<AppGroup>,
+        section: GroupSection,
+        draggedId: String,
+        targetId: String,
+        newGroupId: String,
+        labelDragged: String,
+        labelTarget: String,
+        allowedIds: Set<String>,
+    ): List<AppGroup> {
+        if (draggedId.isBlank() || targetId.isBlank() || draggedId == targetId) return groups
+        if (draggedId !in allowedIds || targetId !in allowedIds) return groups
+        val touched = groups
+            .filter { it.section == section && (draggedId in it.members || targetId in it.members) }
+            .map { it.id }
+            .toSet()
+        val host = groups.find { it.section == section && targetId in it.members }
+        if (host != null) {
+            if (draggedId in host.members) return groups
+            val added = addMember(groups, host.id, draggedId, allowedIds)
+            return dissolveTouchedSingletons(added, touched - host.id)
+        }
+        if (newGroupId.isBlank() || groups.any { it.id == newGroupId }) return groups
+        val name = suggestedName(groups, section, labelTarget, labelDragged)
+        val cleared = strip(strip(groups, section, draggedId), section, targetId)
+        val order = (cleared.filter { it.section == section }.maxOfOrNull { it.order } ?: -1) + 1
+        val created = normalizeOrders(
+            cleared + AppGroup(
+                id = newGroupId,
+                section = section,
+                name = name,
+                order = order,
+                members = listOf(targetId, draggedId),
+            ),
+        )
+        return dissolveTouchedSingletons(created, touched)
+    }
+
+    /**
+     * Drag onto a closed or open folder. A source folder left with one app dissolves.
+     */
+    fun dragIntoFolder(
+        groups: List<AppGroup>,
+        groupId: String,
+        memberId: String,
+        allowedIds: Set<String>,
+    ): List<AppGroup> {
+        val target = groups.find { it.id == groupId } ?: return groups
+        if (memberId in target.members) return groups
+        val touched = groups
+            .filter { it.section == target.section && memberId in it.members }
+            .map { it.id }
+            .toSet()
+        val added = addMember(groups, groupId, memberId, allowedIds)
+        if (added == groups) return groups
+        return dissolveTouchedSingletons(added, touched - groupId)
+    }
+
+    /**
+     * Drag a member onto the empty grid of its section.
+     * One remaining app dissolves the folder. Apps stay launchable.
+     */
+    fun eject(groups: List<AppGroup>, groupId: String, memberId: String): List<AppGroup> {
+        val group = groups.find { it.id == groupId } ?: return groups
+        if (memberId !in group.members) return groups
+        val kept = group.members.filterNot { it == memberId }
+        if (kept.size < 2) return delete(groups, groupId)
+        return removeMember(groups, groupId, memberId)
+    }
+
+    private fun dissolveTouchedSingletons(groups: List<AppGroup>, touchedIds: Set<String>): List<AppGroup> {
+        if (touchedIds.isEmpty()) return groups
+        val drop = groups.filter { it.id in touchedIds && it.members.size < 2 }.map { it.id }.toSet()
+        if (drop.isEmpty()) return groups
+        return normalizeOrders(groups.filterNot { it.id in drop })
+    }
+
+    /**
      * Keep members that are still live in [section]. Other sections stay.
      * Used when a personal app leaves the whitelist or is uninstalled, and when
      * a work app or the whole work profile disappears.

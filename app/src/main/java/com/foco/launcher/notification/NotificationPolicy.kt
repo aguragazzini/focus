@@ -1,14 +1,17 @@
 package com.foco.launcher.notification
 
 /**
- * Pure policy (arch §0 / Nico notes). Android types stay out so unit tests can run on the JVM.
+ * Pure policy. Android types stay out so unit tests can run on the JVM.
  *
- * shouldSuppress:
- *   if work/other UserHandle → false (ALWAYS — never cancel)
- *   if !nlsFilterEnabled || !listenerGranted → false
- *   if protected system/OEM → false
- *   if CALL / ALARM / NAVIGATION / TRANSPORT / MediaStyle / dialer → false
- *   return package ∉ notificationAllowlist  // personal only; empty allowlist cancels all such
+ * Spares always pass: protected system/OEM, CALL, ALARM, NAVIGATION, TRANSPORT,
+ * MediaStyle, media session, dialer. Listener not granted → no cancel.
+ *
+ * Work profile passes unless [workSectionPaused] or [notificationsPaused].
+ * Personal: [notificationsPaused] cancels in-scope apps (allowlist does not save them).
+ * Otherwise the allowlist filter runs only while [nlsFilterEnabled].
+ *
+ * This is Foco's listener cancel path. It does not touch interruption filters,
+ * notification-policy access, device policy, or system quiet mode.
  */
 object NotificationPolicy {
     data class Facts(
@@ -30,11 +33,17 @@ object NotificationPolicy {
         nlsFilterEnabled: Boolean,
         allowlist: Set<String>,
         listenerGranted: Boolean = true,
+        workSectionPaused: Boolean = false,
+        notificationsPaused: Boolean = false,
     ): Boolean {
-        if (facts.isWorkOrOtherProfile) return false
-        if (!nlsFilterEnabled || !listenerGranted) return false
+        if (!listenerGranted) return false
         if (isProtectedSystemOrOem(facts.packageName)) return false
         if (isCallAlarmMediaException(facts)) return false
+        if (facts.isWorkOrOtherProfile) {
+            return workSectionPaused || notificationsPaused
+        }
+        if (notificationsPaused) return true
+        if (!nlsFilterEnabled) return false
         return facts.packageName !in allowlist
     }
 

@@ -67,6 +67,9 @@ class SettingsActivity : ComponentActivity() {
                     onNlsMessageShown = vm::clearNlsMessage,
                     onRefreshWork = vm::refreshWorkList,
                     onOpenWorkSettings = { LaunchController.openWorkProfileSettings(this) },
+                    onWorkPaused = vm::setWorkSectionPaused,
+                    onNotificationsPaused = vm::setNotificationsPaused,
+                    onNamesOnly = vm::setNamesOnly,
                 )
             }
         }
@@ -87,7 +90,6 @@ class SettingsActivity : ComponentActivity() {
             val resolved = LaunchController.workProfileSettingsResolves(this@SettingsActivity)
             withContext(Dispatchers.Main) { vm.setWorkLinkResolved(resolved) }
         }
-        (application as FocoApp).registry.refreshIfPackagesChanged()
         (application as FocoApp).registry.invalidate()
         (application as FocoApp).workCatalog.refresh()
     }

@@ -19,27 +19,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 internal val FocoInk = Color(0xFF0E0E0E)
-internal val FocoInkElevated = Color(0xFF181818)
-internal val FocoPaper = Color(0xFFE8E4DC)
-internal val FocoPaperDim = Color(0xFF8F8A82)
-internal val FocoLine = Color(0xFF2C2C2C)
+internal val FocoInkElevated = Color(0xFF171717)
+internal val FocoPaper = Color(0xFFE6E6E6)
+internal val FocoPaperDim = Color(0xFF8A8A8A)
+internal val FocoLine = Color(0xFF2A2A2A)
 
 private val FocoColors = darkColorScheme(
     primary = FocoPaper,
     onPrimary = FocoInk,
-    primaryContainer = FocoPaper,
-    onPrimaryContainer = FocoInk,
+    primaryContainer = FocoLine,
+    onPrimaryContainer = FocoPaper,
+    inversePrimary = FocoPaperDim,
     secondary = FocoPaperDim,
     onSecondary = FocoInk,
+    secondaryContainer = FocoLine,
+    onSecondaryContainer = FocoPaper,
+    tertiary = FocoPaperDim,
+    onTertiary = FocoInk,
+    tertiaryContainer = FocoLine,
+    onTertiaryContainer = FocoPaper,
     background = FocoInk,
     onBackground = FocoPaper,
     surface = FocoInkElevated,
     onSurface = FocoPaper,
     surfaceVariant = FocoLine,
     onSurfaceVariant = FocoPaperDim,
-    outline = FocoLine,
-    error = Color(0xFFC98980),
+    surfaceTint = Color.Transparent,
+    inverseSurface = FocoPaper,
+    inverseOnSurface = FocoInk,
+    error = FocoPaperDim,
     onError = FocoInk,
+    errorContainer = FocoLine,
+    onErrorContainer = FocoPaper,
+    outline = FocoLine,
+    outlineVariant = FocoLine,
+    scrim = FocoInk,
+    surfaceBright = FocoInkElevated,
+    surfaceDim = FocoInk,
+    surfaceContainer = FocoInkElevated,
+    surfaceContainerHigh = FocoInkElevated,
+    surfaceContainerHighest = FocoLine,
+    surfaceContainerLow = FocoInk,
+    surfaceContainerLowest = FocoInk,
 )
 
 @Composable

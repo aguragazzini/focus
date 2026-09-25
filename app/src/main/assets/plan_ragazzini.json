@@ -1,0 +1,87 @@
+{
+  "weekend": {
+    "title": "Fin de semana · misma base (proteína + verdura)",
+    "rules": [
+      "Tres comidas: desayuno, almuerzo y cena.",
+      "Sin picoteo. Si hay hambre, agua o mate y la próxima comida.",
+      "Después de almuerzo y cena, una caminata corta."
+    ]
+  },
+  "days": [
+    {
+      "weekday": "MONDAY",
+      "theme": "Día del pollo",
+      "breakfast": "Huevos y palta",
+      "breakfastTip": "3 o 4 huevos.",
+      "lunch": "Pollo al horno, zapallitos y zanahoria",
+      "lunchTip": "Pata o muslo con piel y un chorro de oliva.",
+      "dinner": "Tortilla de pollo y espinaca",
+      "dinnerTip": "",
+      "alternateTitles": [
+        "Pollo al horno, solo sal y limón",
+        "Pollo al ajillo",
+        "Milanesas de pollo al horno con parmesano"
+      ]
+    },
+    {
+      "weekday": "TUESDAY",
+      "theme": "Día de la carne vacuna",
+      "breakfast": "Tortilla de verdura",
+      "breakfastTip": "Huevo con zapallito o cebolla, y una fruta.",
+      "lunch": "Carne al horno, berenjena y morrón",
+      "lunchTip": "",
+      "dinner": "Picada con verdura, sin fideos",
+      "dinnerTip": "Extra de oliva o una palta.",
+      "alternateTitles": [
+        "Bife a la plancha con ensalada rápida",
+        "Carne al horno con cebolla, una sola fuente",
+        "Hamburguesas sin pan"
+      ]
+    },
+    {
+      "weekday": "WEDNESDAY",
+      "theme": "Día del cerdo",
+      "breakfast": "Huevos y palta",
+      "breakfastTip": "3 o 4 huevos.",
+      "lunch": "Bondiola al horno, chauchas y zanahoria",
+      "lunchTip": "",
+      "dinner": "Huevos, jamón y espárragos",
+      "dinnerTip": "",
+      "alternateTitles": [
+        "Chuletas de cerdo a la plancha",
+        "Cerdo salteado con pimientos",
+        "Costillitas al horno estilo BBQ"
+      ]
+    },
+    {
+      "weekday": "THURSDAY",
+      "theme": "Día del guiso",
+      "breakfast": "Tortilla de verdura",
+      "breakfastTip": "Huevo con zapallito o cebolla, y una fruta.",
+      "lunch": "Guiso de carne y calabaza",
+      "lunchTip": "Hígado picado fino en el guiso, una vez por semana.",
+      "dinner": "Milanesas al horno y puré de coliflor",
+      "dinnerTip": "Sin pan rallado: huevo y semillas.",
+      "alternateTitles": [
+        "Guiso de pollo con verduras",
+        "Carbonada criolla sin papa",
+        "Guiso verde con acelga o espinaca"
+      ]
+    },
+    {
+      "weekday": "FRIDAY",
+      "theme": "Día del pescado",
+      "breakfast": "Huevos y palta",
+      "breakfastTip": "3 o 4 huevos.",
+      "lunch": "Pescado a la plancha y verdura",
+      "lunchTip": "",
+      "dinner": "Atún, huevo, palta y aceitunas",
+      "dinnerTip": "",
+      "alternateTitles": [
+        "Pescado a la plancha con manteca y limón",
+        "Filet a la plancha con ajo y perejil",
+        "Wrap de atún en lechuga"
+      ]
+    }
+  ]
+}

@@ -205,5 +205,147 @@ class GroupMutationsTest {
         assertEquals("Casa", roundTrip.groups.single().name)
         assertTrue(roundTrip.setupDone)
         assertTrue(roundTrip.nlsFilterEnabled)
+        assertFalse(prefs.workSectionPaused)
+        assertFalse(prefs.notificationsPaused)
+        assertFalse(prefs.namesOnly)
+    }
+
+    @Test
+    fun dragOntoLooseAppCreatesAPairAndKeepsEveryWorkApp() {
+        val placed = GroupMutations.placeOnApp(
+            groups = emptyList(),
+            section = GroupSection.WORK,
+            draggedId = "1:com.chrome/.Main",
+            targetId = "1:com.slack/.Main",
+            newGroupId = "w1",
+            labelDragged = "Chrome",
+            labelTarget = "Slack",
+            allowedIds = work,
+        )
+        assertEquals(listOf("1:com.slack/.Main", "1:com.chrome/.Main"), placed.single().members)
+        assertEquals("Slack Chrome", placed.single().name)
+        val arranged = GroupLayout.arrange(GroupSection.WORK, placed, work.toList())
+        val visible = arranged.groups.flatMap { it.members } + arranged.looseIds
+        assertEquals(work, visible.toSet())
+    }
+
+    @Test
+    fun dragOntoAnExistingMemberJoinsThatFolder() {
+        val created = GroupMutations.placeOnApp(
+            emptyList(),
+            GroupSection.PERSONAL,
+            "messages",
+            "phone",
+            "g1",
+            "Mensajes",
+            "Teléfono",
+            personal,
+        )
+        val joined = GroupMutations.placeOnApp(
+            created,
+            GroupSection.PERSONAL,
+            "camera",
+            "phone",
+            "g2",
+            "Cámara",
+            "Teléfono",
+            personal,
+        )
+        assertEquals(listOf("g1"), joined.map { it.id })
+        assertEquals(listOf("phone", "messages", "camera"), joined.single().members)
+    }
+
+    @Test
+    fun dragIntoAnotherFolderDissolvesASingletonSource() {
+        val first = GroupMutations.placeOnApp(
+            emptyList(),
+            GroupSection.PERSONAL,
+            "messages",
+            "phone",
+            "g1",
+            "Mensajes",
+            "Teléfono",
+            personal,
+        )
+        val second = GroupMutations.placeOnApp(
+            first,
+            GroupSection.PERSONAL,
+            "camera",
+            "settings",
+            "g2",
+            "Cámara",
+            "Ajustes",
+            personal,
+        )
+        val moved = GroupMutations.dragIntoFolder(second, "g2", "messages", personal)
+        assertFalse(moved.any { it.id == "g1" })
+        assertEquals(listOf("settings", "camera", "messages"), moved.first { it.id == "g2" }.members)
+    }
+
+    @Test
+    fun ejectDissolvesWhenOneRemainsAndKeepsALargerFolder() {
+        val pair = GroupMutations.placeOnApp(
+            emptyList(),
+            GroupSection.PERSONAL,
+            "messages",
+            "phone",
+            "g1",
+            "Mensajes",
+            "Teléfono",
+            personal,
+        )
+        assertTrue(GroupMutations.eject(pair, "g1", "phone").isEmpty())
+
+        val trio = GroupMutations.dragIntoFolder(pair, "g1", "camera", personal)
+        val ejected = GroupMutations.eject(trio, "g1", "camera")
+        assertEquals(listOf("phone", "messages"), ejected.single().members)
+    }
+
+    @Test
+    fun dragRejectsCrossSectionIdsAndSelf() {
+        val start = emptyList<AppGroup>()
+        assertEquals(
+            start,
+            GroupMutations.placeOnApp(
+                start,
+                GroupSection.PERSONAL,
+                "1:com.slack/.Main",
+                "phone",
+                "g1",
+                "Slack",
+                "Teléfono",
+                personal,
+            ),
+        )
+        assertEquals(
+            start,
+            GroupMutations.placeOnApp(start, GroupSection.PERSONAL, "phone", "phone", "g1", "A", "A", personal),
+        )
+    }
+
+    @Test
+    fun blankLabelsFallBackToGrupoThenGrupo2() {
+        assertEquals("Grupo", GroupMutations.suggestedName(emptyList(), GroupSection.PERSONAL, " ", ""))
+        val existing = listOf(
+            AppGroup("g1", GroupSection.PERSONAL, "Grupo", 0, listOf("phone", "messages")),
+        )
+        assertEquals("Grupo 2", GroupMutations.suggestedName(existing, GroupSection.PERSONAL, "", ""))
+        assertEquals(24, GroupMutations.suggestedName(emptyList(), GroupSection.PERSONAL, "a".repeat(20), "b".repeat(20)).length)
+    }
+
+    @Test
+    fun menuRemoveStillAllowsASingleMemberFolder() {
+        val pair = GroupMutations.placeOnApp(
+            emptyList(),
+            GroupSection.PERSONAL,
+            "messages",
+            "phone",
+            "g1",
+            "Mensajes",
+            "Teléfono",
+            personal,
+        )
+        val left = GroupMutations.removeMember(pair, "g1", "messages")
+        assertEquals(listOf("phone"), left.single().members)
     }
 }

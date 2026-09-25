@@ -6,9 +6,21 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.BatteryManager
 import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicReference
 
 /** Reads battery and the next alarm. No calendar permission and no network. */
 object HomeGlance {
+    private val cached = AtomicReference<String?>(null)
+
+    /** Last refresh. Null until the first background read finishes. */
+    fun peek(): String? = cached.get()
+
+    fun refresh(context: Context, zone: ZoneId = ZoneId.systemDefault()): String? {
+        val value = line(context, zone)
+        cached.set(value)
+        return value
+    }
+
     fun line(context: Context, zone: ZoneId = ZoneId.systemDefault()): String? {
         return runCatching {
             HomeGlanceFormat.line(batteryPercent(context), alarmLabel(context, zone))

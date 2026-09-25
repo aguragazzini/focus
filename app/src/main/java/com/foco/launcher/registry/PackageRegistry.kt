@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.os.Process
 import android.util.Log
 import com.foco.launcher.BuildConfig
 import kotlinx.coroutines.CoroutineScope
@@ -32,18 +33,38 @@ class PackageRegistry(
     private val publishMutex = Mutex()
 
     private val _launchables = MutableStateFlow<List<LaunchableApp>>(emptyList())
+    /** Full personal launcher catalog. Settings reads this. Home does not. */
     val launchables: StateFlow<List<LaunchableApp>> = _launchables.asStateFlow()
+
+    private val _homeApps = MutableStateFlow<List<LaunchableApp>>(emptyList())
+    /** Whitelist icons only. Stays small after the full catalog is decoded. */
+    val homeApps: StateFlow<List<LaunchableApp>> = _homeApps.asStateFlow()
 
     /** True once whitelist icons are published. Does not wait for the full catalog. */
     private val _loaded = MutableStateFlow(false)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
     private val _catalogLoaded = MutableStateFlow(false)
+    private val stampedIcons = HashMap<String, StampedIcon>()
 
     init {
         scope.launch {
             warmHomeIcons()
             warmCatalog(force = false)
+        }
+        scope.launch {
+            prefsStore.prefs.collect { prefs ->
+                if (_catalogLoaded.value) {
+                    publishMutex.withLock {
+                        if (_catalogLoaded.value) publishHomeSlice(prefs, cache.get())
+                    }
+                } else {
+                    val listed = withContext(Dispatchers.Default) {
+                        loadListed(prefs.entries.map { it.packageName })
+                    }
+                    publishHome(listed)
+                }
+            }
         }
     }
 
@@ -73,7 +94,10 @@ class PackageRegistry(
      */
     fun refreshIfPackagesChanged() {
         scope.launch {
-            if (!_catalogLoaded.value) return@launch
+            if (!_catalogLoaded.value) {
+                warmCatalog(force = false)
+                return@launch
+            }
             val current = peekLauncherPackages()
             val cachedPkgs = cache.get().map { it.packageName }.toSet()
             if (current != cachedPkgs) {
@@ -124,6 +148,7 @@ class PackageRegistry(
      * Replaces only invalidate the icon/label cache.
      */
     fun onPackageEvent(action: String?, packageName: String?, replacing: Boolean) {
+        SuggestedApps.invalidate()
         if (packageName.isNullOrBlank()) {
             invalidate()
             return
@@ -159,18 +184,26 @@ class PackageRegistry(
             _launchables.value = loaded
             _catalogLoaded.value = true
             _loaded.value = true
+            publishHomeSlice(prefsStore.prefs.first(), loaded)
         }
+    }
+
+    private fun publishHomeSlice(prefs: LauncherPrefs, all: List<LaunchableApp>) {
+        val byPkg = all.associateBy { it.packageName }
+        val next = prefs.entries
+            .sortedBy { it.order }
+            .mapNotNull { byPkg[it.packageName] }
+        if (next == _homeApps.value) return
+        _homeApps.value = next
     }
 
     private suspend fun publishHome(apps: List<LaunchableApp>) {
         publishMutex.withLock {
-            if (_catalogLoaded.value) {
-                _loaded.value = true
-                return@withLock
-            }
+            _homeApps.value = apps
+            _loaded.value = true
+            if (_catalogLoaded.value) return@withLock
             cache.set(apps)
             _launchables.value = apps
-            _loaded.value = true
         }
     }
 
@@ -196,22 +229,53 @@ class PackageRegistry(
     }
 
     private fun queryLaunchables(): List<LaunchableApp> {
-        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
-        val resolved = pm.queryIntentActivities(intent, 0)
-        return resolved.mapNotNull { toLaunchable(it) }.sortedBy { it.label.lowercase() }
+        val tid = Process.myTid()
+        val previous = Process.getThreadPriority(tid)
+        Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND)
+        try {
+            val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+            val resolved = pm.queryIntentActivities(intent, 0)
+            return resolved.mapNotNull { toLaunchable(it) }.sortedBy { it.label.lowercase() }
+        } finally {
+            Process.setThreadPriority(previous)
+        }
     }
 
     private fun toLaunchable(ri: ResolveInfo): LaunchableApp? {
         val info = ri.activityInfo ?: return null
         val packageName = info.packageName ?: return null
         if (packageName == appContext.packageName) return null
+        val updatedAt = packageUpdatedAt(packageName)
+        if (updatedAt != 0L) {
+            synchronized(stampedIcons) {
+                val stamped = stampedIcons[packageName]
+                if (stamped != null && stamped.updatedAt == updatedAt) return stamped.app
+            }
+        }
         val label = ri.loadLabel(pm)?.toString().orEmpty().ifBlank { packageName }
         val icon = runCatching {
             ri.loadIcon(pm)?.toBitmapCached() ?: pm.getApplicationIcon(packageName).toBitmapCached()
         }.getOrNull() ?: return null
         val component = ComponentName(packageName, info.name)
-        return LaunchableApp(packageName, label, icon, component)
+        val app = LaunchableApp(packageName, label, icon, component)
+        if (updatedAt != 0L) {
+            synchronized(stampedIcons) {
+                stampedIcons[packageName] = StampedIcon(updatedAt, app)
+            }
+        }
+        return app
     }
+
+    private fun packageUpdatedAt(packageName: String): Long {
+        return runCatching {
+            pm.getPackageInfo(packageName, 0).lastUpdateTime
+        }.getOrDefault(0L)
+    }
+
+    private data class StampedIcon(
+        val updatedAt: Long,
+        val app: LaunchableApp,
+    )
 
     private fun log(message: String) {
         if (BuildConfig.DEBUG) {

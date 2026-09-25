@@ -10,6 +10,7 @@ import android.os.Process
 import android.os.UserHandle
 import android.os.UserManager
 import android.util.Log
+import com.foco.launcher.BuildConfig
 import com.foco.launcher.registry.toBitmapCached
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -171,7 +172,9 @@ class WorkCatalog(context: Context) {
             apps.profiles.filter { it != Process.myUserHandle() }
         }
         if (profilesResult.isFailure) {
-            Log.w(TAG, "getProfiles failed", profilesResult.exceptionOrNull())
+            if (BuildConfig.DEBUG) {
+                Log.w(TAG, "getProfiles failed", profilesResult.exceptionOrNull())
+            }
             return QueryResult(
                 WorkHomeState(loaded = true, hasWorkProfile = false, loadFailed = true),
                 emptyMap(),
@@ -184,7 +187,7 @@ class WorkCatalog(context: Context) {
                 emptyMap(),
             )
         }
-        if (workUsers.size > 1) {
+        if (BuildConfig.DEBUG && workUsers.size > 1) {
             Log.i(TAG, "non-personal profiles=${workUsers.size}; listing every launchable")
         }
         val quietReadings = ArrayList<Boolean?>(workUsers.size)
@@ -197,7 +200,9 @@ class WorkCatalog(context: Context) {
             val listed = runCatching { apps.getActivityList(null, user) }
             if (listed.isFailure) {
                 anyFailure = true
-                Log.w(TAG, "getActivityList failed", listed.exceptionOrNull())
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "getActivityList failed", listed.exceptionOrNull())
+                }
                 continue
             }
             anySuccess = true

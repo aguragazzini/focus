@@ -3,9 +3,13 @@
 package com.foco.launcher.core
 
 import android.graphics.Bitmap
+import android.os.SystemClock
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,11 +22,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -46,6 +52,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -56,10 +63,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -68,12 +79,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.zIndex
 import com.foco.launcher.R
 import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.registry.AppGroup
 import com.foco.launcher.registry.ArrangedSection
+import com.foco.launcher.registry.GroupDrag
 import com.foco.launcher.registry.GroupLayout
 import com.foco.launcher.registry.GroupMutations
 import com.foco.launcher.registry.GroupSection
@@ -126,6 +140,12 @@ fun HomeScreen(
     onRenameGroup: (String, String) -> Unit,
     onRemoveFromGroup: (String, String) -> Unit,
     onDeleteGroup: (String) -> Unit,
+    onDragOntoApp: (GroupSection, String, String, String, String) -> Unit,
+    onDragIntoFolder: (String, String) -> Unit,
+    onDragEject: (String, String) -> Unit,
+    onWorkPaused: (Boolean) -> Unit,
+    onNotificationsPaused: (Boolean) -> Unit,
+    onCrossHint: () -> Unit,
     onEnsureWorkIcon: (String) -> Unit,
     onOpenWorkSettings: () -> Unit,
     onQuietTap: () -> Unit,
@@ -138,6 +158,11 @@ fun HomeScreen(
     var naming by remember { mutableStateOf<GroupNameRequest?>(null) }
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     var workQuery by rememberSaveable { mutableStateOf("") }
+    var openedGroupId by remember { mutableStateOf<String?>(null) }
+    val drag = remember { HomeDragState() }
+    val density = LocalDensity.current
+    val iconPx = with(density) { (if (state.namesOnly) 28.dp else 48.dp).toPx() }
+    var ghostOrigin by remember { mutableStateOf(Offset.Zero) }
 
     val personalArranged = remember(state.groups, state.apps) {
         GroupLayout.arrange(GroupSection.PERSONAL, state.groups, state.apps.map { it.packageName })
@@ -156,6 +181,80 @@ fun HomeScreen(
         }
         if (group == null || group.members.none { it in live }) {
             sheet = null
+        }
+    }
+    LaunchedEffect(openedGroupId, state.groups, state.apps, state.workApps, state.workSectionPaused) {
+        val id = openedGroupId ?: return@LaunchedEffect
+        val group = state.groups.find { it.id == id }
+        val live = when (group?.section) {
+            GroupSection.PERSONAL -> state.apps.map { it.packageName }.toSet()
+            GroupSection.WORK -> state.workApps.map { it.key }.toSet()
+            null -> emptySet()
+        }
+        val hiddenWork = group?.section == GroupSection.WORK && state.workSectionPaused
+        if (group == null || group.members.none { it in live } || hiddenWork) {
+            openedGroupId = null
+            drag.cancel()
+        }
+    }
+
+    fun labelFor(section: GroupSection, id: String): String {
+        return when (section) {
+            GroupSection.PERSONAL -> state.apps.find { it.packageName == id }?.label.orEmpty()
+            GroupSection.WORK -> state.workApps.find { it.key == id }?.label.orEmpty()
+        }
+    }
+
+    fun startDrag(
+        section: GroupSection,
+        cell: HomeCell,
+        fromGroupId: String?,
+        blocked: Set<String>,
+        window: Offset,
+    ) {
+        drag.start(
+            section = section,
+            memberId = cell.id,
+            label = cell.label,
+            fromGroupId = fromGroupId,
+            blockedTargetIds = blocked,
+            x = window.x,
+            y = window.y,
+            iconWidth = iconPx,
+            iconHeight = iconPx,
+            icon = if (state.namesOnly) null else cell.icon,
+            nowMs = SystemClock.uptimeMillis(),
+        )
+    }
+
+    fun moveDrag(window: Offset) {
+        drag.move(window.x, window.y, SystemClock.uptimeMillis())
+    }
+
+    fun endDrag() {
+        val finished = drag.finish() ?: return
+        val (session, action) = finished
+        when (action) {
+            GroupDrag.Action.CREATE -> {
+                val targetId = session.hover.targetId ?: return
+                onDragOntoApp(
+                    session.section,
+                    session.memberId,
+                    session.label,
+                    targetId,
+                    labelFor(session.section, targetId),
+                )
+            }
+            GroupDrag.Action.ADD -> {
+                val groupId = session.hover.targetId ?: return
+                onDragIntoFolder(groupId, session.memberId)
+            }
+            GroupDrag.Action.REMOVE -> {
+                val groupId = session.fromGroupId ?: return
+                onDragEject(groupId, session.memberId)
+            }
+            GroupDrag.Action.REJECT_CROSS -> onCrossHint()
+            GroupDrag.Action.SNAP_BACK -> Unit
         }
     }
 
@@ -181,7 +280,14 @@ fun HomeScreen(
         containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
-        Box(Modifier.fillMaxSize()) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { coords ->
+                    val next = coords.localToWindow(Offset.Zero)
+                    if (next != ghostOrigin) ghostOrigin = next
+                },
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -191,6 +297,9 @@ fun HomeScreen(
         ) {
             HomeOverflow(
                 showWorkRefresh = state.workKind != WorkSectionKind.Hidden,
+                showWorkPause = state.hasWorkProfile,
+                workPaused = state.workSectionPaused,
+                onToggleWork = { onWorkPaused(!state.workSectionPaused) },
                 onAddApps = onAddApps,
                 onEditApps = onEditApps,
                 onOpenFocoSettings = onOpenFocoSettings,
@@ -205,13 +314,51 @@ fun HomeScreen(
             ) {
                 item(key = "clock") {
                     Spacer(Modifier.height(12.dp))
+                    val catalog = remember(context) {
+                        Santoral1962.peek() ?: runCatching {
+                            context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
+                                Santoral1962.parse(reader.readText())
+                            }
+                        }.getOrNull()?.also { Santoral1962.store(it) }
+                    }
                     HomeClock(
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
                         modifier = Modifier.padding(horizontal = 24.dp),
                         readGlance = { HomeGlance.line(context) },
+                        underDate = { date ->
+                            val feast = catalog?.let { Santoral1962.resolve(it, date) }
+                            if (feast != null) SantoralLine(feast)
+                        },
+                        belowGlance = {
+                            val meals = remember(context) {
+                                DietPlan.peek() ?: runCatching {
+                                    context.assets.open("plan_ragazzini.json").bufferedReader().use { reader ->
+                                        DietPlan.parse(reader.readText())
+                                    }
+                                }.getOrNull()?.also { DietPlan.store(it) }
+                            }
+                            if (meals != null) {
+                                Spacer(Modifier.height(10.dp))
+                                DietGlance(
+                                    plan = meals,
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                )
+                            }
+                        },
                     )
-                    Spacer(Modifier.height(32.dp))
+                    if (state.notificationsPaused || (state.workSectionPaused && state.hasWorkProfile)) {
+                        Spacer(Modifier.height(16.dp))
+                        PauseChips(
+                            showWork = state.workSectionPaused && state.hasWorkProfile,
+                            showAvisos = state.notificationsPaused,
+                            onResumeWork = { onWorkPaused(false) },
+                            onResumeAvisos = { onNotificationsPaused(false) },
+                        )
+                        Spacer(Modifier.height(16.dp))
+                    } else {
+                        Spacer(Modifier.height(32.dp))
+                    }
                 }
                 item(key = "banner") {
                     when (state.banner) {
@@ -247,36 +394,52 @@ fun HomeScreen(
                         loose = { id -> personalByPkg[id]?.toCell() },
                         folder = { group ->
                             val members = group.members.mapNotNull { personalByPkg[it] }
-                            group.toCell(members.map { it.icon })
+                            group.toCell(members.map { it.icon }, labels = members.map { it.label })
                         },
                     ).chunked(4)
                     items(
                         items = rows,
                         key = { row -> "p:" + row.joinToString("|") { it.key } },
                     ) { row ->
+                        val rowKey = "p:" + row.joinToString("|") { it.key }
                         AppRow(
                             cells = row,
+                            section = GroupSection.PERSONAL,
+                            rowKey = rowKey,
                             iconEpoch = 0L,
+                            namesOnly = state.namesOnly,
+                            drag = drag,
+                            dragApps = true,
+                            fromGroupId = null,
                             modifier = Modifier.padding(horizontal = 24.dp),
                             onClick = { cell ->
                                 if (cell.groupId != null) {
-                                    sheet = HomeSheet.Open(cell.groupId)
+                                    openedGroupId = cell.groupId
                                 } else {
                                     onLaunch(cell.id)
                                 }
                             },
                             onLongClick = { cell ->
                                 if (cell.groupId != null) {
+                                    openedGroupId = null
                                     sheet = HomeSheet.Open(cell.groupId)
                                 } else {
                                     personalByPkg[cell.id]?.let { sheet = HomeSheet.Personal(it) }
                                 }
                             },
                             onEnsureIcon = null,
+                            onDragStart = { cell, window ->
+                                startDrag(GroupSection.PERSONAL, cell, null, emptySet(), window)
+                            },
+                            onDrag = { window -> moveDrag(window) },
+                            onDragEnd = { endDrag() },
                         )
                     }
+                    item(key = "personal-pad") {
+                        GridPad(drag = drag, section = GroupSection.PERSONAL, rowKey = "personal-pad")
+                    }
                 }
-                if (state.workKind != WorkSectionKind.Hidden) {
+                if (state.workKind != WorkSectionKind.Hidden && !state.workSectionPaused) {
                     item(key = "work-divider") {
                         Spacer(Modifier.height(8.dp))
                         HorizontalDivider(
@@ -352,7 +515,8 @@ fun HomeScreen(
                                     },
                                     folder = { group ->
                                         val icons = group.members.map { state.workIcons[it] }
-                                        group.toCell(icons, muted)
+                                        val labels = group.members.mapNotNull { byKey[it]?.label }
+                                        group.toCell(icons, muted, labels)
                                     },
                                 )
                             }
@@ -361,13 +525,20 @@ fun HomeScreen(
                                 items = rows,
                                 key = { row -> "w:" + row.joinToString("|") { it.key } },
                             ) { row ->
+                                val rowKey = "w:" + row.joinToString("|") { it.key }
                                 AppRow(
                                     cells = row,
+                                    section = GroupSection.WORK,
+                                    rowKey = rowKey,
                                     iconEpoch = state.workIconEpoch,
+                                    namesOnly = state.namesOnly,
+                                    drag = drag,
+                                    dragApps = !searching,
+                                    fromGroupId = null,
                                     modifier = Modifier.padding(horizontal = 24.dp),
                                     onClick = { cell ->
                                         if (cell.groupId != null) {
-                                            sheet = HomeSheet.Open(cell.groupId)
+                                            openedGroupId = cell.groupId
                                         } else if (muted) {
                                             onQuietTap()
                                         } else {
@@ -376,6 +547,7 @@ fun HomeScreen(
                                     },
                                     onLongClick = { cell ->
                                         if (cell.groupId != null) {
+                                            openedGroupId = null
                                             sheet = HomeSheet.Open(cell.groupId)
                                         } else {
                                             byKey[cell.id]?.let { sheet = HomeSheet.Work(it) }
@@ -392,7 +564,17 @@ fun HomeScreen(
                                             onEnsureWorkIcon(cell.id)
                                         }
                                     },
+                                    onDragStart = { cell, window ->
+                                        startDrag(GroupSection.WORK, cell, null, emptySet(), window)
+                                    },
+                                    onDrag = { window -> moveDrag(window) },
+                                    onDragEnd = { endDrag() },
                                 )
+                            }
+                            if (!searching) {
+                                item(key = "work-pad") {
+                                    GridPad(drag = drag, section = GroupSection.WORK, rowKey = "work-pad")
+                                }
                             }
                         }
                     }
@@ -407,6 +589,50 @@ fun HomeScreen(
                 }
             }
         }
+
+        val openGroup = openedGroupId?.let { id -> state.groups.find { it.id == id } }
+        if (openGroup != null) {
+            OpenFolderOverlay(
+                group = openGroup,
+                personalApps = state.apps,
+                workApps = state.workApps,
+                workIcons = state.workIcons,
+                namesOnly = state.namesOnly,
+                workMuted = state.workKind == WorkSectionKind.Quiet,
+                drag = drag,
+                onDismiss = { openedGroupId = null },
+                onPanelBounds = { drag.folderPanel = it },
+                onLaunchPersonal = onLaunch,
+                onLaunchWork = { app ->
+                    if (state.workKind == WorkSectionKind.Quiet) onQuietTap() else onLaunchWork(app)
+                },
+                onLongClick = {
+                    openedGroupId = null
+                    sheet = HomeSheet.Open(openGroup.id)
+                },
+                onDragStart = { cell, window ->
+                    startDrag(
+                        section = openGroup.section,
+                        cell = cell,
+                        fromGroupId = openGroup.id,
+                        blocked = openGroup.members.filter { it != cell.id }.toSet(),
+                        window = window,
+                    )
+                },
+                onDrag = { window -> moveDrag(window) },
+                onDragEnd = { endDrag() },
+                onEnsureMember = if (openGroup.section == GroupSection.WORK) onEnsureWorkIcon else null,
+            )
+            DisposableEffect(openGroup.id) {
+                onDispose { drag.folderPanel = null }
+            }
+        }
+
+        HomeDragGhost(
+            drag = drag,
+            namesOnly = state.namesOnly,
+            origin = ghostOrigin,
+        )
 
     val activeSheet = sheet
     if (activeSheet != null) {
@@ -601,6 +827,9 @@ fun HomeScreen(
 @Composable
 private fun HomeOverflow(
     showWorkRefresh: Boolean,
+    showWorkPause: Boolean,
+    workPaused: Boolean,
+    onToggleWork: () -> Unit,
     onAddApps: () -> Unit,
     onEditApps: () -> Unit,
     onOpenFocoSettings: () -> Unit,
@@ -632,12 +861,24 @@ private fun HomeOverflow(
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            DropdownMenu(
+                expanded = menu,
+                onDismissRequest = { menu = false },
+                containerColor = FocoInkElevated,
+                tonalElevation = 0.dp,
+                shadowElevation = 0.dp,
+            ) {
                 OverflowItem(R.string.menu_add) { pending = onAddApps; menu = false }
                 OverflowItem(R.string.menu_edit) { pending = onEditApps; menu = false }
                 OverflowItem(R.string.menu_settings) { pending = onOpenFocoSettings; menu = false }
                 OverflowItem(R.string.menu_default) { pending = onChooseDefault; menu = false }
                 OverflowItem(R.string.menu_system) { pending = onOpenSystemSettings; menu = false }
+                if (showWorkPause) {
+                    OverflowItem(if (workPaused) R.string.work_resume else R.string.work_pause) {
+                        pending = onToggleWork
+                        menu = false
+                    }
+                }
                 if (showWorkRefresh) {
                     OverflowItem(R.string.menu_refresh_work) { pending = onRefreshWork; menu = false }
                 }
@@ -810,6 +1051,7 @@ private data class HomeCell(
     val muted: Boolean = false,
     val groupId: String? = null,
     val folderIcons: List<Bitmap?> = emptyList(),
+    val memberLabels: List<String> = emptyList(),
 ) {
     val key: String get() = if (groupId != null) "g:$groupId" else id
 }
@@ -818,13 +1060,18 @@ private fun LaunchableApp.toCell(): HomeCell = HomeCell(packageName, label, icon
 
 private fun WorkApp.toCell(icon: Bitmap?, muted: Boolean): HomeCell = HomeCell(key, label, icon, muted)
 
-private fun AppGroup.toCell(icons: List<Bitmap?>, muted: Boolean = false): HomeCell {
+private fun AppGroup.toCell(
+    icons: List<Bitmap?>,
+    muted: Boolean = false,
+    labels: List<String> = emptyList(),
+): HomeCell {
     return HomeCell(
         id = id,
         label = name,
         muted = muted,
         groupId = id,
         folderIcons = icons.take(4),
+        memberLabels = labels.take(4),
     )
 }
 
@@ -844,29 +1091,51 @@ private fun sectionCells(
 @Composable
 private fun AppRow(
     cells: List<HomeCell>,
+    section: GroupSection,
+    rowKey: String,
     iconEpoch: Long,
+    namesOnly: Boolean,
+    drag: HomeDragState,
+    dragApps: Boolean,
+    fromGroupId: String?,
     onClick: (HomeCell) -> Unit,
     onLongClick: ((HomeCell) -> Unit)?,
     onEnsureIcon: ((HomeCell) -> Unit)?,
+    onDragStart: (HomeCell, Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .onGloballyPositioned { drag.putRow(rowKey, section, it.toDragBounds()) },
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         cells.forEach { cell ->
             AppCell(
                 cell = cell,
+                section = section,
                 iconEpoch = iconEpoch,
+                namesOnly = namesOnly,
+                drag = drag,
+                dragApps = dragApps,
+                fromGroupId = fromGroupId,
                 modifier = Modifier.weight(1f),
                 onClick = { onClick(cell) },
                 onLongClick = onLongClick?.let { callback -> { callback(cell) } },
                 onEnsureIcon = onEnsureIcon?.let { callback -> { callback(cell) } },
+                onDragStart = { window -> onDragStart(cell, window) },
+                onDrag = onDrag,
+                onDragEnd = onDragEnd,
             )
         }
         repeat(4 - cells.size) {
             Spacer(Modifier.weight(1f))
         }
+    }
+    DisposableEffect(rowKey) {
+        onDispose { drag.removeRow(rowKey) }
     }
     Spacer(Modifier.height(16.dp))
 }
@@ -874,52 +1143,87 @@ private fun AppRow(
 @Composable
 private fun AppCell(
     cell: HomeCell,
+    section: GroupSection,
     iconEpoch: Long,
+    namesOnly: Boolean,
+    drag: HomeDragState,
+    dragApps: Boolean,
+    fromGroupId: String?,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
     onEnsureIcon: (() -> Unit)?,
+    onDragStart: (Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
 ) {
     if (onEnsureIcon != null) {
         LaunchedEffect(cell.id, iconEpoch) { onEnsureIcon() }
     }
-    val bitmap = cell.icon
-    val image = if (bitmap != null) remember(cell.id, bitmap) { bitmap.asImageBitmap() } else null
+    val tileKey = "$section:${fromGroupId ?: "grid"}:${cell.key}"
+    val coords = remember { CoordRef() }
+    DisposableEffect(tileKey) {
+        onDispose { drag.removeTile(tileKey) }
+    }
+    val chrome = drag.chrome
+    val highlight = highlightFor(chrome, cell.id, cell.groupId)
+    val lifted = chrome != null &&
+        chrome.section == section &&
+        chrome.memberId == cell.id &&
+        chrome.fromGroupId == fromGroupId &&
+        cell.groupId == null
+    val canDrag = dragApps && cell.groupId == null
     val iconAlpha = if (cell.muted) 0.4f else 1f
     Column(
         modifier = modifier
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick,
+            .then(
+                if (canDrag) {
+                    Modifier.homeTileGesture(
+                        key = tileKey,
+                        enabled = true,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                        onDragStart = { local ->
+                            val window = coords.value?.takeIf { it.isAttached }?.localToWindow(local)
+                                ?: return@homeTileGesture
+                            onDragStart(window)
+                        },
+                        onDrag = { local ->
+                            val window = coords.value?.takeIf { it.isAttached }?.localToWindow(local)
+                                ?: return@homeTileGesture
+                            onDrag(window)
+                        },
+                        onDragEnd = onDragEnd,
+                    )
+                } else {
+                    Modifier.combinedClickable(
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                    )
+                },
             )
-            .padding(vertical = 4.dp),
+            .onGloballyPositioned { coords.value = it }
+            .padding(vertical = 4.dp)
+            .alpha(if (lifted) 0.28f else 1f),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (cell.groupId != null) {
-            FolderIcon(
-                icons = cell.folderIcons,
-                description = stringResource(R.string.group_cd, cell.label),
-                alpha = iconAlpha,
-            )
-        } else if (image != null) {
-            Image(
-                bitmap = image,
-                contentDescription = cell.label,
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .alpha(iconAlpha),
-                contentScale = ContentScale.Fit,
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(FocoLine)
-                    .alpha(iconAlpha),
-            )
-        }
+        TileFace(
+            cell = cell,
+            namesOnly = namesOnly,
+            highlight = highlight,
+            iconAlpha = iconAlpha,
+            modifier = Modifier.onGloballyPositioned { coords ->
+                drag.putTile(
+                    key = tileKey,
+                    tile = GroupDrag.Tile(
+                        section = section,
+                        id = cell.groupId ?: cell.id,
+                        folder = cell.groupId != null,
+                        bounds = coords.toDragBounds(),
+                    ),
+                )
+            },
+        )
         Spacer(Modifier.height(6.dp))
         Text(
             text = cell.label,
@@ -928,32 +1232,134 @@ private fun AppCell(
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth(),
         )
     }
 }
 
 @Composable
-private fun FolderIcon(icons: List<Bitmap?>, description: String, alpha: Float) {
-    val slots = List(4) { index -> icons.getOrNull(index) }
+private fun TileFace(
+    cell: HomeCell,
+    namesOnly: Boolean,
+    highlight: CellHighlight,
+    iconAlpha: Float,
+    modifier: Modifier = Modifier,
+) {
+    val shape = RoundedCornerShape(12.dp)
+    val ring = when (highlight) {
+        CellHighlight.Valid -> FocoPaper
+        CellHighlight.Invalid -> FocoPaperDim
+        CellHighlight.None -> Color.Transparent
+    }
+    val shift = remember { Animatable(0f) }
+    LaunchedEffect(highlight) {
+        if (highlight == CellHighlight.Invalid) {
+            shift.snapTo(4f)
+            shift.animateTo(0f, tween(90))
+        } else {
+            shift.snapTo(0f)
+        }
+    }
     Box(
-        modifier = Modifier
+        modifier = modifier.offset { IntOffset(shift.value.toInt(), 0) },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (highlight == CellHighlight.Valid) {
+            Box(
+                modifier = Modifier
+                    .size(if (namesOnly && cell.groupId == null) 28.dp else 48.dp)
+                    .offset(x = 4.dp, y = 4.dp)
+                    .clip(shape)
+                    .background(FocoLine),
+            )
+        }
+        val face = Modifier
+            .border(2.dp, ring, shape)
+            .alpha(iconAlpha)
+        if (cell.groupId != null) {
+            FolderIcon(
+                icons = cell.folderIcons,
+                labels = cell.memberLabels,
+                namesOnly = namesOnly,
+                description = stringResource(R.string.group_cd, cell.label),
+                modifier = face,
+            )
+        } else if (namesOnly) {
+            NameGlyph(
+                label = cell.label,
+                modifier = face,
+            )
+        } else {
+            val bitmap = cell.icon
+            val image = if (bitmap != null) remember(cell.id, bitmap) { bitmap.asImageBitmap() } else null
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = cell.label,
+                    modifier = face
+                        .size(48.dp)
+                        .clip(shape),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Box(
+                    modifier = face
+                        .size(48.dp)
+                        .clip(shape)
+                        .background(FocoLine)
+                        .semantics { contentDescription = cell.label },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NameGlyph(label: String, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(28.dp)
+            .clip(CircleShape)
+            .background(FocoLine)
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = tileInitial(label),
+            style = MaterialTheme.typography.labelLarge,
+            color = FocoPaperDim,
+        )
+    }
+}
+
+@Composable
+private fun FolderIcon(
+    icons: List<Bitmap?>,
+    labels: List<String>,
+    namesOnly: Boolean,
+    description: String,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier = modifier
             .size(48.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(FocoLine)
-            .alpha(alpha)
             .padding(4.dp)
             .semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            for (row in slots.chunked(2)) {
+            for (indexRow in 0 until 2) {
                 Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                    for (icon in row) {
-                        MiniIcon(icon)
-                    }
-                    if (row.size == 1) {
-                        Spacer(Modifier.size(18.dp))
+                    for (column in 0 until 2) {
+                        val index = indexRow * 2 + column
+                        if (namesOnly) {
+                            MiniLetter(labels.getOrNull(index))
+                        } else {
+                            MiniIcon(icons.getOrNull(index))
+                        }
                     }
                 }
             }
@@ -962,10 +1368,27 @@ private fun FolderIcon(icons: List<Bitmap?>, description: String, alpha: Float) 
 }
 
 @Composable
+private fun MiniLetter(label: String?) {
+    Box(
+        modifier = Modifier.size(18.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (label != null) {
+            Text(
+                text = tileInitial(label),
+                style = MaterialTheme.typography.labelSmall,
+                color = FocoPaper,
+            )
+        }
+    }
+}
+
+@Composable
 private fun MiniIcon(bitmap: Bitmap?) {
     if (bitmap != null) {
+        val image = remember(bitmap) { bitmap.asImageBitmap() }
         Image(
-            bitmap = bitmap.asImageBitmap(),
+            bitmap = image,
             contentDescription = null,
             modifier = Modifier
                 .size(18.dp)
@@ -1232,4 +1655,191 @@ private fun Modifier.longPressEmpty(onLongClick: () -> Unit): Modifier {
         onClick = {},
         onLongClick = onLongClick,
     )
+}
+
+@Composable
+private fun PauseChips(
+    showWork: Boolean,
+    showAvisos: Boolean,
+    onResumeWork: () -> Unit,
+    onResumeAvisos: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (showWork) {
+            PauseChip(stringResource(R.string.work_paused_chip), onResumeWork)
+        }
+        if (showAvisos) {
+            PauseChip(stringResource(R.string.nls_paused_chip), onResumeAvisos)
+        }
+    }
+}
+
+@Composable
+private fun PauseChip(label: String, onClick: () -> Unit) {
+    Text(
+        text = label,
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(FocoInkElevated)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .semantics { contentDescription = label },
+        style = MaterialTheme.typography.bodyMedium,
+        color = FocoPaperDim,
+    )
+}
+
+@Composable
+private fun GridPad(drag: HomeDragState, section: GroupSection, rowKey: String) {
+    Spacer(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(72.dp)
+            .onGloballyPositioned { drag.putRow(rowKey, section, it.toDragBounds()) },
+    )
+    DisposableEffect(rowKey) {
+        onDispose { drag.removeRow(rowKey) }
+    }
+}
+
+@Composable
+private fun OpenFolderOverlay(
+    group: AppGroup,
+    personalApps: List<LaunchableApp>,
+    workApps: List<WorkApp>,
+    workIcons: Map<String, Bitmap>,
+    namesOnly: Boolean,
+    workMuted: Boolean,
+    drag: HomeDragState,
+    onDismiss: () -> Unit,
+    onPanelBounds: (GroupDrag.Bounds) -> Unit,
+    onLaunchPersonal: (String) -> Unit,
+    onLaunchWork: (WorkApp) -> Unit,
+    onLongClick: () -> Unit,
+    onDragStart: (HomeCell, Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    onEnsureMember: ((String) -> Unit)?,
+) {
+    val scrimAlpha = if (drag.chrome?.fromGroupId == group.id) 0.35f else 0.72f
+    val cells = when (group.section) {
+        GroupSection.PERSONAL -> {
+            val byPkg = personalApps.associateBy { it.packageName }
+            group.members.mapNotNull { id -> byPkg[id]?.toCell() }
+        }
+        GroupSection.WORK -> {
+            val byKey = workApps.associateBy { it.key }
+            group.members.mapNotNull { id -> byKey[id]?.toCell(workIcons[id], workMuted) }
+        }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(3f),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(FocoInk.copy(alpha = scrimAlpha))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss,
+                ),
+        )
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 28.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(FocoInkElevated)
+                .onGloballyPositioned { onPanelBounds(it.toDragBounds()) }
+                .padding(vertical = 12.dp),
+        ) {
+            Text(
+                text = group.name,
+                style = MaterialTheme.typography.bodyLarge,
+                color = FocoPaper,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            cells.chunked(4).forEach { row ->
+                AppRow(
+                    cells = row,
+                    section = group.section,
+                    rowKey = "open:${group.id}:" + row.joinToString("|") { it.key },
+                    iconEpoch = 0L,
+                    namesOnly = namesOnly,
+                    drag = drag,
+                    dragApps = true,
+                    fromGroupId = group.id,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                    onClick = { cell ->
+                        if (group.section == GroupSection.PERSONAL) {
+                            onLaunchPersonal(cell.id)
+                        } else {
+                            workApps.find { it.key == cell.id }?.let(onLaunchWork)
+                        }
+                    },
+                    onLongClick = { onLongClick() },
+                    onEnsureIcon = onEnsureMember?.let { ensure -> { cell -> ensure(cell.id) } },
+                    onDragStart = onDragStart,
+                    onDrag = onDrag,
+                    onDragEnd = onDragEnd,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeDragGhost(drag: HomeDragState, namesOnly: Boolean, origin: Offset) {
+    val pose = drag.ghost ?: return
+    DragGhost(pose = pose, namesOnly = namesOnly, origin = origin)
+}
+
+@Composable
+private fun DragGhost(pose: GhostPose, namesOnly: Boolean, origin: Offset) {
+    val shape = RoundedCornerShape(12.dp)
+    val x = pose.pointerX - origin.x - pose.iconWidth / 2f
+    val y = pose.pointerY - origin.y - pose.iconHeight / 2f
+    Box(
+        modifier = Modifier
+            .zIndex(5f)
+            .offset { IntOffset(x.toInt(), y.toInt()) }
+            .graphicsLayer {
+                scaleX = 1.06f
+                scaleY = 1.06f
+                shadowElevation = 8.dp.toPx()
+                this.shape = shape
+                clip = false
+            },
+    ) {
+        if (namesOnly) {
+            NameGlyph(label = pose.label)
+        } else {
+            val bitmap = pose.icon
+            val image = if (bitmap != null) remember(bitmap) { bitmap.asImageBitmap() } else null
+            if (image != null) {
+                Image(
+                    bitmap = image,
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(shape),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(shape)
+                        .background(FocoLine),
+                )
+            }
+        }
+    }
 }

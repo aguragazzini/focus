@@ -51,6 +51,10 @@ data class HomeUiState(
     val workLink: Boolean = false,
     val showBio: Boolean = false,
     val bioOnCount: Int = 0,
+    val hasWorkProfile: Boolean = false,
+    val workSectionPaused: Boolean = false,
+    val notificationsPaused: Boolean = false,
+    val namesOnly: Boolean = false,
 )
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
@@ -64,11 +68,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshDeviceFacts()
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             combine(
                 app.startupReady,
                 app.prefsStore.prefs,
-                app.registry.launchables,
+                app.registry.homeApps,
                 app.registry.loaded,
             ) { startupReady, prefs, all, iconsLoaded ->
                 StartupSnap(startupReady, prefs, all, iconsLoaded)
@@ -182,6 +186,71 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun dragOntoApp(
+        section: GroupSection,
+        draggedId: String,
+        draggedLabel: String,
+        targetId: String,
+        targetLabel: String,
+    ) {
+        val id = UUID.randomUUID().toString()
+        val workAllowed = workMemberIds()
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val allowed = allowedIds(prefs, section, workAllowed)
+                val next = GroupMutations.placeOnApp(
+                    groups = prefs.groups,
+                    section = section,
+                    draggedId = draggedId,
+                    targetId = targetId,
+                    newGroupId = id,
+                    labelDragged = draggedLabel,
+                    labelTarget = targetLabel,
+                    allowedIds = allowed,
+                )
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    fun dragIntoFolder(groupId: String, memberId: String) {
+        val workAllowed = workMemberIds()
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val section = prefs.groups.find { it.id == groupId }?.section ?: return@update prefs
+                val allowed = allowedIds(prefs, section, workAllowed)
+                val next = GroupMutations.dragIntoFolder(prefs.groups, groupId, memberId, allowed)
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    fun dragEject(groupId: String, memberId: String) {
+        viewModelScope.launch {
+            app.prefsStore.update { prefs ->
+                val next = GroupMutations.eject(prefs.groups, groupId, memberId)
+                if (next == prefs.groups) prefs else prefs.copy(groups = next)
+            }
+        }
+    }
+
+    fun setWorkSectionPaused(paused: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setWorkSectionPaused(paused)
+            if (!paused) app.workCatalog.refresh()
+        }
+    }
+
+    fun setNotificationsPaused(paused: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setNotificationsPaused(paused)
+        }
+    }
+
+    fun showCrossSectionHint() {
+        message.value = getApplication<Application>().getString(R.string.drag_cross_hint)
+    }
+
     private fun workMemberIds(): Set<String> {
         val work = app.workCatalog.state.value
         if (!work.loaded || work.loadFailed || !work.hasWorkProfile) return emptySet()
@@ -272,6 +341,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             } else {
                 0
             },
+            hasWorkProfile = work.loaded && work.hasWorkProfile,
+            workSectionPaused = snap.prefs.workSectionPaused,
+            notificationsPaused = snap.prefs.notificationsPaused,
+            namesOnly = snap.prefs.namesOnly,
         )
     }
 

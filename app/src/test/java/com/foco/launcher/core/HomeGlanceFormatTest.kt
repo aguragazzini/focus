@@ -50,6 +50,7 @@ class HomeGlanceFormatTest {
         assertFalse(blob.contains("weather"))
         val manifest = File("src/main/AndroidManifest.xml").readText()
         assertFalse(manifest.contains("READ_CALENDAR"))
+        assertFalse(manifest.contains("INTERNET"))
     }
 
     private fun at(year: Int, month: Int, day: Int, hour: Int, minute: Int): Long {

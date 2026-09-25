@@ -9,8 +9,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Único lugar que cancela notificaciones.
- * Work profile: never cancel. No inbox. No Device Admin.
+ * Only place that cancels notifications.
+ * Work profile passes unless a Foco pause flag says otherwise.
+ * No inbox. No device admin. No system interruption filter.
  */
 class FocoNotificationListener : NotificationListenerService() {
     override fun onListenerConnected() {
