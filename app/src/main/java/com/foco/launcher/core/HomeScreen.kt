@@ -28,6 +28,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -39,7 +43,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -57,6 +60,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -82,10 +86,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.foco.launcher.R
 import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.registry.AppGroup
+import com.foco.launcher.registry.HomePageSpec
+import com.foco.launcher.registry.HomePages
 import com.foco.launcher.registry.ArrangedSection
 import com.foco.launcher.registry.GroupDrag
 import com.foco.launcher.registry.GroupLayout
@@ -96,6 +103,7 @@ import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.work.WorkApp
 import com.foco.launcher.work.WorkCatalogRules
 import com.foco.launcher.work.WorkSectionKind
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeLoading(modifier: Modifier = Modifier) {
@@ -110,7 +118,7 @@ fun HomeLoading(modifier: Modifier = Modifier) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 trackColor = MaterialTheme.colorScheme.surfaceVariant,
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(FocoSpace.gapLg))
             Text(
                 text = stringResource(R.string.home_loading),
                 style = MaterialTheme.typography.bodyMedium,
@@ -150,6 +158,15 @@ fun HomeScreen(
     onOpenWorkSettings: () -> Unit,
     onQuietTap: () -> Unit,
     onMessageShown: () -> Unit,
+    requestEdit: Boolean = false,
+    onEditRequestConsumed: () -> Unit = {},
+    onCreatePage: (String, String) -> Unit = { _, _ -> },
+    onRenamePage: (String, String) -> Unit = { _, _ -> },
+    onMovePage: (String, Int) -> Unit = { _, _ -> },
+    onHidePage: (String, Boolean) -> Unit = { _, _ -> },
+    onDeletePage: (String) -> Unit = {},
+    onPhonePaused: (Boolean) -> Unit = {},
+    onPackagePaused: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -159,6 +176,7 @@ fun HomeScreen(
     var confirmDeleteId by remember { mutableStateOf<String?>(null) }
     var workQuery by rememberSaveable { mutableStateOf("") }
     var openedGroupId by remember { mutableStateOf<String?>(null) }
+    var editing by rememberSaveable { mutableStateOf(false) }
     val drag = remember { HomeDragState() }
     val density = LocalDensity.current
     val iconPx = with(density) { (if (state.namesOnly) 28.dp else 48.dp).toPx() }
@@ -258,6 +276,14 @@ fun HomeScreen(
         }
     }
 
+    LaunchedEffect(requestEdit) {
+        if (requestEdit) {
+            sheet = null
+            editing = true
+            onEditRequestConsumed()
+        }
+    }
+
     LaunchedEffect(state.message) {
         val msg = state.message ?: return@LaunchedEffect
         snackbar.showSnackbar(msg)
@@ -307,285 +333,143 @@ fun HomeScreen(
                 onOpenSystemSettings = onOpenSystemSettings,
                 onRefreshWork = onRefreshWork,
             )
-            LazyColumn(
+            val scope = rememberCoroutineScope()
+            val visible = HomePages.visible(state.homePages)
+            val landing = HomePages.landingIndex(visible)
+            val pagerState = rememberPagerState(
+                initialPage = landing.coerceIn(0, (visible.size - 1).coerceAtLeast(0)),
+            ) { visible.size.coerceAtLeast(1) }
+            LaunchedEffect(visible.size) {
+                val last = (visible.size - 1).coerceAtLeast(0)
+                if (pagerState.currentPage > last) pagerState.scrollToPage(last)
+            }
+            val pageLabels = visible.map { pageLabel(it) }
+            HomePagerCue(
+                labels = pageLabels,
+                page = pagerState.currentPage.coerceIn(0, (pageLabels.size - 1).coerceAtLeast(0)),
+                onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
+                onEdit = {
+                    sheet = null
+                    editing = true
+                },
+            )
+            val bannerPageId = visible.firstOrNull { it.type == HomePages.TYPE_PERSONAL }?.id
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-            ) {
-                item(key = "clock") {
-                    Spacer(Modifier.height(12.dp))
-                    val catalog = remember(context) {
-                        Santoral1962.peek() ?: runCatching {
-                            context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
-                                Santoral1962.parse(reader.readText())
-                            }
-                        }.getOrNull()?.also { Santoral1962.store(it) }
-                    }
-                    HomeClock(
+                userScrollEnabled = drag.chrome == null,
+                verticalAlignment = Alignment.Top,
+                key = { index -> visible.getOrNull(index)?.id ?: index },
+            ) { page ->
+                val spec = visible.getOrNull(page)
+                when (spec?.type) {
+                    HomePages.TYPE_CLOCK -> ClockHomePage(
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
-                        modifier = Modifier.padding(horizontal = 24.dp),
-                        readGlance = { HomeGlance.line(context) },
-                        underDate = { date ->
-                            val feast = catalog?.let { Santoral1962.resolve(it, date) }
-                            if (feast != null) SantoralLine(feast)
-                        },
-                        belowGlance = {
-                            val meals = remember(context) {
-                                DietPlan.peek() ?: runCatching {
-                                    context.assets.open("plan_ragazzini.json").bufferedReader().use { reader ->
-                                        DietPlan.parse(reader.readText())
-                                    }
-                                }.getOrNull()?.also { DietPlan.store(it) }
-                            }
-                            if (meals != null) {
-                                Spacer(Modifier.height(10.dp))
-                                DietGlance(
-                                    plan = meals,
-                                    modifier = Modifier.padding(horizontal = 12.dp),
-                                )
-                            }
-                        },
+                        onOpenSystemSettings = onOpenSystemSettings,
                     )
-                    if (state.notificationsPaused || (state.workSectionPaused && state.hasWorkProfile)) {
-                        Spacer(Modifier.height(16.dp))
-                        PauseChips(
-                            showWork = state.workSectionPaused && state.hasWorkProfile,
-                            showAvisos = state.notificationsPaused,
-                            onResumeWork = { onWorkPaused(false) },
-                            onResumeAvisos = { onNotificationsPaused(false) },
-                        )
-                        Spacer(Modifier.height(16.dp))
-                    } else {
-                        Spacer(Modifier.height(32.dp))
-                    }
-                }
-                item(key = "banner") {
-                    when (state.banner) {
-                        HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
-                        HomeBanner.Nls -> NlsOffBanner(
-                            disconnected = state.nlsAttention == NlsRecovery.Attention.Disconnected,
-                            onOpenAvisos = onOpenAvisos,
-                        )
-                        HomeBanner.None -> Unit
-                    }
-                    if (state.banner != HomeBanner.None) {
-                        Spacer(Modifier.height(16.dp))
-                    }
-                }
-                item(key = "personal-header") {
-                    SectionTitle(
-                        text = stringResource(R.string.section_personal),
-                        modifier = Modifier.padding(horizontal = 24.dp),
+                    HomePages.TYPE_PERSONAL -> PersonalHomePage(
+                        state = state,
+                        arranged = personalArranged,
+                        drag = drag,
+                        pageKey = spec.id,
+                        title = spec.label,
+                        showBanners = spec.id == bannerPageId,
+                        showPause = true,
+                        onAddApps = onAddApps,
+                        onOpenSystemSettings = onOpenSystemSettings,
+                        onChooseDefault = onChooseDefault,
+                        onOpenAvisos = onOpenAvisos,
+                        onNotificationsPaused = onNotificationsPaused,
+                        onPhonePaused = onPhonePaused,
+                        onPackagePaused = onPackagePaused,
+                        onLaunch = onLaunch,
+                        onOpenGroup = { openedGroupId = it },
+                        onPersonalSheet = { sheet = HomeSheet.Personal(it) },
+                        onGroupSheet = {
+                            openedGroupId = null
+                            sheet = HomeSheet.Open(it)
+                        },
+                        onDragStart = { cell, window ->
+                            startDrag(GroupSection.PERSONAL, cell, null, emptySet(), window)
+                        },
+                        onDrag = { window -> moveDrag(window) },
+                        onDragEnd = { endDrag() },
                     )
-                    Spacer(Modifier.height(12.dp))
-                }
-                if (personalArranged.groups.isEmpty() && personalArranged.looseIds.isEmpty()) {
-                    item(key = "personal-empty") {
-                        PersonalEmptyInline(
-                            onAddApps = onAddApps,
+                    HomePages.TYPE_APPS -> PersonalHomePage(
+                        state = state,
+                        arranged = personalArranged,
+                        drag = drag,
+                        pageKey = spec.id,
+                        title = spec.label,
+                        showBanners = false,
+                        showPause = false,
+                        titleFallback = R.string.home_page_apps,
+                        onAddApps = onAddApps,
+                        onOpenSystemSettings = onOpenSystemSettings,
+                        onChooseDefault = onChooseDefault,
+                        onOpenAvisos = onOpenAvisos,
+                        onNotificationsPaused = onNotificationsPaused,
+                        onPhonePaused = onPhonePaused,
+                        onPackagePaused = onPackagePaused,
+                        onLaunch = onLaunch,
+                        onOpenGroup = { openedGroupId = it },
+                        onPersonalSheet = { sheet = HomeSheet.Personal(it) },
+                        onGroupSheet = {
+                            openedGroupId = null
+                            sheet = HomeSheet.Open(it)
+                        },
+                        onDragStart = { cell, window ->
+                            startDrag(GroupSection.PERSONAL, cell, null, emptySet(), window)
+                        },
+                        onDrag = { window -> moveDrag(window) },
+                        onDragEnd = { endDrag() },
+                    )
+                    HomePages.TYPE_DIET -> {
+                        val meals = remember(context) {
+                            DietPlan.peek() ?: runCatching {
+                                context.assets.open("plan_ragazzini.json").bufferedReader().use { reader ->
+                                    DietPlan.parse(reader.readText())
+                                }
+                            }.getOrNull()?.also { DietPlan.store(it) }
+                        }
+                        DietPage(
+                            plan = meals,
                             onOpenSystemSettings = onOpenSystemSettings,
                         )
                     }
-                } else {
-                    val personalByPkg = state.apps.associateBy { it.packageName }
-                    val rows = sectionCells(
-                        arranged = personalArranged,
-                        loose = { id -> personalByPkg[id]?.toCell() },
-                        folder = { group ->
-                            val members = group.members.mapNotNull { personalByPkg[it] }
-                            group.toCell(members.map { it.icon }, labels = members.map { it.label })
+                    HomePages.TYPE_WORK -> WorkHomePage(
+                        state = state,
+                        pageKey = spec.id,
+                        title = spec.label,
+                        arranged = workArranged,
+                        visible = workVisible,
+                        searchOpen = searchOpen,
+                        query = if (searchOpen) workQuery else "",
+                        drag = drag,
+                        onQuery = { workQuery = it },
+                        onOpenWorkSettings = onOpenWorkSettings,
+                        onRefreshWork = onRefreshWork,
+                        onWorkPaused = onWorkPaused,
+                        onOpenSystemSettings = onOpenSystemSettings,
+                        onQuietTap = onQuietTap,
+                        onLaunchWork = onLaunchWork,
+                        onEnsureWorkIcon = onEnsureWorkIcon,
+                        onOpenGroup = { openedGroupId = it },
+                        onWorkSheet = { sheet = HomeSheet.Work(it) },
+                        onGroupSheet = {
+                            openedGroupId = null
+                            sheet = HomeSheet.Open(it)
                         },
-                    ).chunked(4)
-                    items(
-                        items = rows,
-                        key = { row -> "p:" + row.joinToString("|") { it.key } },
-                    ) { row ->
-                        val rowKey = "p:" + row.joinToString("|") { it.key }
-                        AppRow(
-                            cells = row,
-                            section = GroupSection.PERSONAL,
-                            rowKey = rowKey,
-                            iconEpoch = 0L,
-                            namesOnly = state.namesOnly,
-                            drag = drag,
-                            dragApps = true,
-                            fromGroupId = null,
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                            onClick = { cell ->
-                                if (cell.groupId != null) {
-                                    openedGroupId = cell.groupId
-                                } else {
-                                    onLaunch(cell.id)
-                                }
-                            },
-                            onLongClick = { cell ->
-                                if (cell.groupId != null) {
-                                    openedGroupId = null
-                                    sheet = HomeSheet.Open(cell.groupId)
-                                } else {
-                                    personalByPkg[cell.id]?.let { sheet = HomeSheet.Personal(it) }
-                                }
-                            },
-                            onEnsureIcon = null,
-                            onDragStart = { cell, window ->
-                                startDrag(GroupSection.PERSONAL, cell, null, emptySet(), window)
-                            },
-                            onDrag = { window -> moveDrag(window) },
-                            onDragEnd = { endDrag() },
-                        )
-                    }
-                    item(key = "personal-pad") {
-                        GridPad(drag = drag, section = GroupSection.PERSONAL, rowKey = "personal-pad")
-                    }
-                }
-                if (state.workKind != WorkSectionKind.Hidden && !state.workSectionPaused) {
-                    item(key = "work-divider") {
-                        Spacer(Modifier.height(8.dp))
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                            thickness = 1.dp,
-                            color = FocoLine,
-                        )
-                        Spacer(Modifier.height(20.dp))
-                    }
-                    item(key = "work-header") {
-                        WorkHeader(
-                            kind = state.workKind,
-                            query = if (searchOpen) workQuery else "",
-                            showSearch = searchOpen,
-                            showQuietLink = state.workLink,
-                            onQuery = { workQuery = it },
-                            onOpenWorkSettings = onOpenWorkSettings,
-                        )
-                    }
-                    when {
-                        WorkCatalogRules.showErrorCopy(state.workKind) -> {
-                            item(key = "work-error") {
-                                Column(Modifier.padding(horizontal = 24.dp)) {
-                                    Text(
-                                        text = stringResource(R.string.work_load_error),
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    FocoTextButton(onClick = onRefreshWork) {
-                                        Text(stringResource(R.string.work_retry))
-                                    }
-                                }
-                            }
-                        }
-                        WorkCatalogRules.showWorkEmptyCopy(state.workKind) -> {
-                            item(key = "work-empty") {
-                                Text(
-                                    text = stringResource(R.string.work_empty),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 24.dp),
-                                )
-                            }
-                        }
-                        searchOpen && workQuery.isNotBlank() && workVisible.isEmpty() -> {
-                            item(key = "work-search-empty") {
-                                Text(
-                                    text = stringResource(R.string.work_search_empty),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(horizontal = 24.dp),
-                                )
-                            }
-                        }
-                        WorkCatalogRules.showWorkGrid(
-                            state.workKind,
-                            if (searchOpen && workQuery.isNotBlank()) {
-                                workVisible.size
-                            } else {
-                                workArranged.groups.size + workArranged.looseIds.size
-                            },
-                        ) -> {
-                            val byKey = state.workApps.associateBy { it.key }
-                            val muted = state.workKind == WorkSectionKind.Quiet
-                            val searching = searchOpen && workQuery.isNotBlank()
-                            val cells = if (searching) {
-                                workVisible.map { app -> app.toCell(state.workIcons[app.key], muted) }
-                            } else {
-                                sectionCells(
-                                    arranged = workArranged,
-                                    loose = { id ->
-                                        byKey[id]?.toCell(state.workIcons[id], muted)
-                                    },
-                                    folder = { group ->
-                                        val icons = group.members.map { state.workIcons[it] }
-                                        val labels = group.members.mapNotNull { byKey[it]?.label }
-                                        group.toCell(icons, muted, labels)
-                                    },
-                                )
-                            }
-                            val rows = cells.chunked(4)
-                            items(
-                                items = rows,
-                                key = { row -> "w:" + row.joinToString("|") { it.key } },
-                            ) { row ->
-                                val rowKey = "w:" + row.joinToString("|") { it.key }
-                                AppRow(
-                                    cells = row,
-                                    section = GroupSection.WORK,
-                                    rowKey = rowKey,
-                                    iconEpoch = state.workIconEpoch,
-                                    namesOnly = state.namesOnly,
-                                    drag = drag,
-                                    dragApps = !searching,
-                                    fromGroupId = null,
-                                    modifier = Modifier.padding(horizontal = 24.dp),
-                                    onClick = { cell ->
-                                        if (cell.groupId != null) {
-                                            openedGroupId = cell.groupId
-                                        } else if (muted) {
-                                            onQuietTap()
-                                        } else {
-                                            byKey[cell.id]?.let(onLaunchWork)
-                                        }
-                                    },
-                                    onLongClick = { cell ->
-                                        if (cell.groupId != null) {
-                                            openedGroupId = null
-                                            sheet = HomeSheet.Open(cell.groupId)
-                                        } else {
-                                            byKey[cell.id]?.let { sheet = HomeSheet.Work(it) }
-                                        }
-                                    },
-                                    onEnsureIcon = { cell ->
-                                        if (cell.groupId != null) {
-                                            workArranged.groups
-                                                .find { it.id == cell.groupId }
-                                                ?.members
-                                                ?.take(4)
-                                                ?.forEach(onEnsureWorkIcon)
-                                        } else {
-                                            onEnsureWorkIcon(cell.id)
-                                        }
-                                    },
-                                    onDragStart = { cell, window ->
-                                        startDrag(GroupSection.WORK, cell, null, emptySet(), window)
-                                    },
-                                    onDrag = { window -> moveDrag(window) },
-                                    onDragEnd = { endDrag() },
-                                )
-                            }
-                            if (!searching) {
-                                item(key = "work-pad") {
-                                    GridPad(drag = drag, section = GroupSection.WORK, rowKey = "work-pad")
-                                }
-                            }
-                        }
-                    }
-                }
-                item(key = "escape") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(120.dp)
-                            .longPressEmpty(onOpenSystemSettings),
+                        onDragStart = { cell, window ->
+                            startDrag(GroupSection.WORK, cell, null, emptySet(), window)
+                        },
+                        onDrag = { window -> moveDrag(window) },
+                        onDragEnd = { endDrag() },
                     )
+                    else -> Unit
                 }
             }
         }
@@ -647,10 +531,16 @@ fun HomeScreen(
             when (activeSheet) {
                 is HomeSheet.Personal -> PersonalAppSheet(
                     app = activeSheet.app,
+                    paused = activeSheet.app.packageName in state.pausedPackages,
                     onOpen = {
                         val pkg = activeSheet.app.packageName
                         sheet = null
                         onLaunch(pkg)
+                    },
+                    onPause = {
+                        val pkg = activeSheet.app.packageName
+                        val paused = pkg in state.pausedPackages
+                        onPackagePaused(pkg, !paused)
                     },
                     onAddToGroup = {
                         sheet = HomeSheet.Pick(
@@ -672,10 +562,16 @@ fun HomeScreen(
                 )
                 is HomeSheet.Work -> WorkAppSheet(
                     app = activeSheet.app,
+                    paused = activeSheet.app.packageName in state.pausedPackages,
                     onOpen = {
                         val target = activeSheet.app
                         sheet = null
                         if (state.workKind == WorkSectionKind.Quiet) onQuietTap() else onLaunchWork(target)
+                    },
+                    onPause = {
+                        val pkg = activeSheet.app.packageName
+                        val paused = pkg in state.pausedPackages
+                        onPackagePaused(pkg, !paused)
                     },
                     onAddToGroup = {
                         sheet = HomeSheet.Pick(
@@ -820,9 +716,694 @@ fun HomeScreen(
             },
         )
     }
+
+    if (editing) {
+        HomeEditSheet(
+            pages = state.homePages,
+            onRename = onRenamePage,
+            onMove = onMovePage,
+            onHide = onHidePage,
+            onDelete = onDeletePage,
+            onCreate = onCreatePage,
+            onDismiss = { editing = false },
+        )
+    }
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeEditSheet(
+    pages: List<HomePageSpec>,
+    onRename: (String, String) -> Unit,
+    onMove: (String, Int) -> Unit,
+    onHide: (String, Boolean) -> Unit,
+    onDelete: (String) -> Unit,
+    onCreate: (String, String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var picking by remember { mutableStateOf(false) }
+    var renameId by remember { mutableStateOf<String?>(null) }
+    val renameTarget = pages.find { it.id == renameId }
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = FocoInkElevated,
+        contentColor = FocoPaper,
+        tonalElevation = 0.dp,
+        dragHandle = { BottomSheetDefaults.DragHandle(color = FocoPaperDim) },
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = FocoSpace.page, end = FocoSpace.page, bottom = FocoSpace.sheet),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.home_edit),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FocoPaper,
+                )
+                FocoTextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.home_edit_done))
+                }
+            }
+            val visibleCount = pages.count { !it.hidden }
+            pages.forEachIndexed { index, page ->
+                val name = pageLabel(page)
+                Text(
+                    text = name,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { renameId = page.id }
+                        .padding(top = 14.dp),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (page.hidden) FocoPaperDim else FocoPaper,
+                )
+                Text(
+                    text = if (page.hidden) {
+                        stringResource(R.string.home_edit_hidden)
+                    } else {
+                        pageLabel(page.copy(label = ""))
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FocoPaperDim,
+                )
+                Row {
+                    if (index > 0) {
+                        FocoTextButton(onClick = { onMove(page.id, -1) }) {
+                            Text(stringResource(R.string.home_edit_up))
+                        }
+                    }
+                    if (index < pages.lastIndex) {
+                        FocoTextButton(onClick = { onMove(page.id, 1) }) {
+                            Text(stringResource(R.string.home_edit_down))
+                        }
+                    }
+                    if (page.hidden || visibleCount > 1) {
+                        FocoTextButton(onClick = { onHide(page.id, !page.hidden) }) {
+                            Text(
+                                stringResource(
+                                    if (page.hidden) R.string.home_edit_show else R.string.home_edit_hide,
+                                ),
+                            )
+                        }
+                    }
+                    if (HomePages.canDelete(pages, page.id)) {
+                        FocoTextButton(onClick = { onDelete(page.id) }) {
+                            Text(stringResource(R.string.home_edit_delete))
+                        }
+                    }
+                }
+            }
+            if (!picking && pages.size < HomePages.MAX) {
+                FocoTextButton(onClick = { picking = true }) {
+                    Text(stringResource(R.string.home_edit_add))
+                }
+            }
+            if (picking) {
+                HomePageTypePicker(
+                    onPick = { type, label ->
+                        picking = false
+                        onCreate(type, label)
+                    },
+                )
+            }
+        }
+    }
+    val naming = renameTarget
+    if (naming != null) {
+        HomePageNameDialog(
+            initial = pageLabel(naming),
+            onDismiss = { renameId = null },
+            onConfirm = { raw ->
+                onRename(naming.id, raw)
+                renameId = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun HomePageTypePicker(onPick: (String, String) -> Unit) {
+    val types = listOf(
+        HomePages.TYPE_CLOCK to R.string.page_clock,
+        HomePages.TYPE_PERSONAL to R.string.section_personal,
+        HomePages.TYPE_APPS to R.string.home_page_apps,
+        HomePages.TYPE_DIET to R.string.page_diet,
+        HomePages.TYPE_WORK to R.string.section_work,
+    )
+    types.forEach { (type, labelRes) ->
+        val label = stringResource(labelRes)
+        Text(
+            text = label,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onPick(type, label) }
+                .padding(vertical = 12.dp),
+            style = MaterialTheme.typography.bodyLarge,
+            color = FocoPaper,
+        )
+    }
+}
+
+@Composable
+private fun HomePageNameDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var raw by remember { mutableStateOf(initial) }
+    val clean = raw.trim().replace(Regex("\\s+"), " ").take(GroupMutations.NAME_MAX)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        tonalElevation = 0.dp,
+        text = {
+            OutlinedTextField(
+                value = raw,
+                onValueChange = { raw = it },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = FocoPaper),
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { onConfirm(clean) }),
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedTextColor = FocoPaper,
+                    unfocusedTextColor = FocoPaper,
+                    focusedBorderColor = FocoPaperDim,
+                    unfocusedBorderColor = FocoLine,
+                    cursorColor = FocoPaper,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                ),
+            )
+        },
+        confirmButton = {
+            FocoTextButton(onClick = { onConfirm(clean) }) {
+                Text(stringResource(R.string.home_edit_done))
+            }
+        },
+        dismissButton = {
+            FocoTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.group_cancel))
+            }
+        },
+    )
+}
+
+@Composable
+private fun ClockHomePage(
+    onOpenClock: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenSystemSettings: () -> Unit,
+) {
+    val context = LocalContext.current
+    val vetus = remember(context) {
+        Santoral1962.peek() ?: runCatching {
+            context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
+                Santoral1962.parse(reader.readText())
+            }
+        }.getOrNull()?.also { Santoral1962.store(it) }
+    }
+    val novus = remember(context) {
+        SantoralNovus.peek() ?: runCatching {
+            context.assets.open("santoral_novus.json").bufferedReader().use { reader ->
+                SantoralNovus.parse(reader.readText())
+            }
+        }.getOrNull()?.also { SantoralNovus.store(it) }
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.height(FocoSpace.gapLg))
+        HomeClock(
+            onOpenClock = onOpenClock,
+            onOpenCalendar = onOpenCalendar,
+            modifier = Modifier.padding(horizontal = FocoSpace.page),
+            zone = HomeClockFormat.CIVIL_ZONE,
+            readGlance = { HomeGlance.line(context, HomeClockFormat.CIVIL_ZONE) },
+            underDate = { date ->
+                val traditional = vetus?.let { Santoral1962.resolve(it, date) }
+                if (traditional != null) {
+                    SantoralLine(
+                        day = traditional,
+                        label = stringResource(R.string.santoral_vetus),
+                    )
+                }
+                val roman = novus?.let { SantoralNovus.resolve(it, date) }
+                if (roman != null) {
+                    SantoralLine(
+                        day = roman,
+                        label = stringResource(R.string.santoral_novus),
+                        novus = true,
+                    )
+                }
+            },
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(120.dp)
+                .homeLongPress(onOpenSystemSettings),
+        )
+    }
+}
+
+@Composable
+private fun PersonalHomePage(
+    state: HomeUiState,
+    arranged: ArrangedSection,
+    drag: HomeDragState,
+    pageKey: String,
+    title: String,
+    showBanners: Boolean,
+    showPause: Boolean,
+    titleFallback: Int = R.string.section_personal,
+    onAddApps: () -> Unit,
+    onOpenSystemSettings: () -> Unit,
+    onChooseDefault: () -> Unit,
+    onOpenAvisos: () -> Unit,
+    onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
+    onPackagePaused: (String, Boolean) -> Unit,
+    onLaunch: (String) -> Unit,
+    onOpenGroup: (String) -> Unit,
+    onPersonalSheet: (LaunchableApp) -> Unit,
+    onGroupSheet: (String) -> Unit,
+    onDragStart: (HomeCell, Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        if (showBanners) {
+            item(key = "$pageKey:banner") {
+                when (state.banner) {
+                    HomeBanner.NotDefault -> NotDefaultBanner(onChooseDefault)
+                    HomeBanner.Nls -> NlsOffBanner(
+                        disconnected = state.nlsAttention == NlsRecovery.Attention.Disconnected,
+                        onOpenAvisos = onOpenAvisos,
+                    )
+                    HomeBanner.None -> Unit
+                }
+                if (state.banner != HomeBanner.None) {
+                    Spacer(Modifier.height(FocoSpace.section))
+                }
+            }
+        }
+        item(key = "$pageKey:personal-header") {
+            Spacer(Modifier.height(FocoSpace.gap))
+            SectionTitle(
+                text = title.ifBlank { stringResource(titleFallback) },
+                modifier = Modifier.padding(horizontal = FocoSpace.page),
+            )
+            if (showPause) {
+                Spacer(Modifier.height(FocoSpace.gap))
+                PagePause(
+                    paused = state.notificationsPaused,
+                    idle = stringResource(R.string.nls_pause),
+                    active = stringResource(R.string.nls_paused_chip),
+                    onClick = { onNotificationsPaused(!state.notificationsPaused) },
+                )
+                Spacer(Modifier.height(FocoSpace.gap))
+                PagePause(
+                    paused = state.phonePaused,
+                    idle = stringResource(R.string.phone_pause),
+                    active = stringResource(R.string.phone_paused_chip),
+                    onClick = { onPhonePaused(!state.phonePaused) },
+                )
+            }
+            Spacer(Modifier.height(FocoSpace.section))
+        }
+        if (arranged.groups.isEmpty() && arranged.looseIds.isEmpty()) {
+            item(key = "$pageKey:personal-empty") {
+                PersonalEmptyInline(
+                    onAddApps = onAddApps,
+                    onOpenSystemSettings = onOpenSystemSettings,
+                )
+            }
+        } else {
+            val personalByPkg = state.apps.associateBy { it.packageName }
+            val paused = state.pausedPackages.toSet()
+            val rows = sectionCells(
+                arranged = arranged,
+                loose = { id ->
+                    personalByPkg[id]?.toCell()?.copy(paused = id in paused)
+                },
+                folder = { group ->
+                    val members = group.members.mapNotNull { personalByPkg[it] }
+                    group.toCell(members.map { it.icon }, labels = members.map { it.label })
+                },
+            ).chunked(4)
+            items(
+                items = rows,
+                key = { row -> "$pageKey:p:" + row.joinToString("|") { it.key } },
+            ) { row ->
+                val rowKey = "$pageKey:p:" + row.joinToString("|") { it.key }
+                AppRow(
+                    cells = row,
+                    section = GroupSection.PERSONAL,
+                    rowKey = rowKey,
+                    iconEpoch = 0L,
+                    namesOnly = state.namesOnly,
+                    drag = drag,
+                    dragApps = true,
+                    fromGroupId = null,
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
+                    onClick = { cell ->
+                        if (cell.groupId != null) {
+                            onOpenGroup(cell.groupId)
+                        } else {
+                            onLaunch(cell.id)
+                        }
+                    },
+                    onLongClick = { cell ->
+                        if (cell.groupId != null) {
+                            onGroupSheet(cell.groupId)
+                        } else {
+                            personalByPkg[cell.id]?.let(onPersonalSheet)
+                        }
+                    },
+                    onEnsureIcon = null,
+                    onDragStart = onDragStart,
+                    onDrag = onDrag,
+                    onDragEnd = onDragEnd,
+                )
+            }
+            item(key = "$pageKey:personal-pad") {
+                GridPad(drag = drag, section = GroupSection.PERSONAL, rowKey = "$pageKey:personal-pad")
+            }
+        }
+        item(key = "$pageKey:escape") {
+            EscapePad(onOpenSystemSettings)
+        }
+    }
+}
+
+@Composable
+private fun WorkHomePage(
+    state: HomeUiState,
+    pageKey: String,
+    title: String,
+    arranged: ArrangedSection,
+    visible: List<WorkApp>,
+    searchOpen: Boolean,
+    query: String,
+    drag: HomeDragState,
+    onQuery: (String) -> Unit,
+    onOpenWorkSettings: () -> Unit,
+    onRefreshWork: () -> Unit,
+    onWorkPaused: (Boolean) -> Unit,
+    onOpenSystemSettings: () -> Unit,
+    onQuietTap: () -> Unit,
+    onLaunchWork: (WorkApp) -> Unit,
+    onEnsureWorkIcon: (String) -> Unit,
+    onOpenGroup: (String) -> Unit,
+    onWorkSheet: (WorkApp) -> Unit,
+    onGroupSheet: (String) -> Unit,
+    onDragStart: (HomeCell, Offset) -> Unit,
+    onDrag: (Offset) -> Unit,
+    onDragEnd: () -> Unit,
+) {
+    val focoPaused = state.workSectionPaused && state.hasWorkProfile
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item(key = "$pageKey:work-header") {
+            Spacer(Modifier.height(FocoSpace.gap))
+            SectionTitle(
+                text = title.ifBlank { stringResource(R.string.section_work) },
+                modifier = Modifier.padding(horizontal = FocoSpace.page),
+            )
+            if (state.hasWorkProfile) {
+                Spacer(Modifier.height(FocoSpace.gap))
+                PagePause(
+                    paused = focoPaused,
+                    idle = stringResource(R.string.work_pause),
+                    active = stringResource(R.string.work_paused_chip),
+                    onClick = { onWorkPaused(!state.workSectionPaused) },
+                )
+            }
+            Spacer(Modifier.height(FocoSpace.gapLg))
+        }
+        if (focoPaused) {
+            item(key = "$pageKey:work-paused") {
+                Text(
+                    text = stringResource(R.string.work_pause_status),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = FocoPaperDim,
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
+                )
+            }
+        } else if (state.workKind == WorkSectionKind.Hidden) {
+            item(key = "$pageKey:work-absent") {
+                Text(
+                    text = stringResource(R.string.settings_work_none),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
+                )
+            }
+        } else {
+            item(key = "$pageKey:work-tools") {
+                WorkHeader(
+                    kind = state.workKind,
+                    query = query,
+                    showSearch = searchOpen,
+                    showQuietLink = state.workLink,
+                    showTitle = false,
+                    onQuery = onQuery,
+                    onOpenWorkSettings = onOpenWorkSettings,
+                )
+            }
+            when {
+                WorkCatalogRules.showErrorCopy(state.workKind) -> {
+                    item(key = "$pageKey:work-error") {
+                        Column(Modifier.padding(horizontal = FocoSpace.page)) {
+                            Text(
+                                text = stringResource(R.string.work_load_error),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            FocoTextButton(onClick = onRefreshWork) {
+                                Text(stringResource(R.string.work_retry))
+                            }
+                        }
+                    }
+                }
+                WorkCatalogRules.showWorkEmptyCopy(state.workKind) -> {
+                    item(key = "$pageKey:work-empty") {
+                        Text(
+                            text = stringResource(R.string.work_empty),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = FocoSpace.page),
+                        )
+                    }
+                }
+                searchOpen && query.isNotBlank() && visible.isEmpty() -> {
+                    item(key = "$pageKey:work-search-empty") {
+                        Text(
+                            text = stringResource(R.string.work_search_empty),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = FocoSpace.page),
+                        )
+                    }
+                }
+                WorkCatalogRules.showWorkGrid(
+                    state.workKind,
+                    if (searchOpen && query.isNotBlank()) {
+                        visible.size
+                    } else {
+                        arranged.groups.size + arranged.looseIds.size
+                    },
+                ) -> {
+                    val byKey = state.workApps.associateBy { it.key }
+                    val muted = state.workKind == WorkSectionKind.Quiet
+                    val pausedPkgs = state.pausedPackages.toSet()
+                    val searching = searchOpen && query.isNotBlank()
+                    val cells = if (searching) {
+                        visible.map { app ->
+                            app.toCell(state.workIcons[app.key], muted, app.packageName in pausedPkgs)
+                        }
+                    } else {
+                        sectionCells(
+                            arranged = arranged,
+                            loose = { id ->
+                                byKey[id]?.let { app ->
+                                    app.toCell(state.workIcons[id], muted, app.packageName in pausedPkgs)
+                                }
+                            },
+                            folder = { group ->
+                                val icons = group.members.map { state.workIcons[it] }
+                                val labels = group.members.mapNotNull { byKey[it]?.label }
+                                group.toCell(icons, muted, labels)
+                            },
+                        )
+                    }
+                    val rows = cells.chunked(4)
+                    items(
+                        items = rows,
+                        key = { row -> "$pageKey:w:" + row.joinToString("|") { it.key } },
+                    ) { row ->
+                        val rowKey = "$pageKey:w:" + row.joinToString("|") { it.key }
+                        AppRow(
+                            cells = row,
+                            section = GroupSection.WORK,
+                            rowKey = rowKey,
+                            iconEpoch = state.workIconEpoch,
+                            namesOnly = state.namesOnly,
+                            drag = drag,
+                            dragApps = !searching,
+                            fromGroupId = null,
+                            modifier = Modifier.padding(horizontal = FocoSpace.page),
+                            onClick = { cell ->
+                                if (cell.groupId != null) {
+                                    onOpenGroup(cell.groupId)
+                                } else if (muted) {
+                                    onQuietTap()
+                                } else {
+                                    byKey[cell.id]?.let(onLaunchWork)
+                                }
+                            },
+                            onLongClick = { cell ->
+                                if (cell.groupId != null) {
+                                    onGroupSheet(cell.groupId)
+                                } else {
+                                    byKey[cell.id]?.let(onWorkSheet)
+                                }
+                            },
+                            onEnsureIcon = { cell ->
+                                if (cell.groupId != null) {
+                                    arranged.groups
+                                        .find { it.id == cell.groupId }
+                                        ?.members
+                                        ?.take(4)
+                                        ?.forEach(onEnsureWorkIcon)
+                                } else {
+                                    onEnsureWorkIcon(cell.id)
+                                }
+                            },
+                            onDragStart = onDragStart,
+                            onDrag = onDrag,
+                            onDragEnd = onDragEnd,
+                        )
+                    }
+                    if (!searching) {
+                        item(key = "$pageKey:work-pad") {
+                            GridPad(drag = drag, section = GroupSection.WORK, rowKey = "$pageKey:work-pad")
+                        }
+                    }
+                }
+            }
+        }
+        item(key = "$pageKey:escape") {
+            EscapePad(onOpenSystemSettings)
+        }
+    }
+}
+
+@Composable
+private fun pageLabel(page: HomePageSpec): String {
+    if (page.label.isNotBlank()) return page.label
+    return stringResource(
+        when (page.type) {
+            HomePages.TYPE_CLOCK -> R.string.page_clock
+            HomePages.TYPE_PERSONAL -> R.string.section_personal
+            HomePages.TYPE_DIET -> R.string.page_diet
+            HomePages.TYPE_WORK -> R.string.section_work
+            else -> R.string.home_page_apps
+        },
+    )
+}
+
+@Composable
+private fun HomePagerCue(
+    labels: List<String>,
+    page: Int,
+    onSelect: (Int) -> Unit,
+    onEdit: () -> Unit,
+) {
+    val safePage = page.coerceIn(0, (labels.size - 1).coerceAtLeast(0))
+    val current = labels.getOrNull(safePage).orEmpty()
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = FocoSpace.hair, bottom = FocoSpace.gap),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Row(horizontalArrangement = Arrangement.Center) {
+            labels.forEachIndexed { index, label ->
+                val selected = index == safePage
+                Box(
+                    modifier = Modifier
+                        .size(FocoSpace.touch)
+                        .clickable { onSelect(index) }
+                        .semantics { contentDescription = label },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(if (selected) 7.dp else 5.dp)
+                            .clip(CircleShape)
+                            .background(if (selected) FocoPaper else FocoLine),
+                    )
+                }
+            }
+        }
+        Text(
+            text = current,
+            modifier = Modifier.combinedClickable(
+                onClick = {},
+                onLongClick = onEdit,
+            ),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            fontSize = 11.sp,
+        )
+    }
+}
+
+@Composable
+private fun PagePause(
+    paused: Boolean,
+    idle: String,
+    active: String,
+    onClick: () -> Unit,
+) {
+    val label = if (paused) active else idle
+    Text(
+        text = label,
+        modifier = Modifier
+            .padding(horizontal = FocoSpace.page)
+            .clip(RoundedCornerShape(50))
+            .background(if (paused) FocoInkElevated else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.gap)
+            .semantics { contentDescription = label },
+        style = MaterialTheme.typography.bodyMedium,
+        color = FocoPaperDim,
+    )
+}
+
+@Composable
+private fun EscapePad(onOpenSystemSettings: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(120.dp)
+            .homeLongPress(onOpenSystemSettings),
+    )
+}
+
 
 @Composable
 private fun HomeOverflow(
@@ -932,7 +1513,7 @@ private fun BannerRow(message: String, action: String, onAction: () -> Unit) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .weight(1f)
-                .padding(start = 24.dp),
+                .padding(start = FocoSpace.page),
         )
         FocoTextButton(onClick = onAction) {
             Text(action)
@@ -946,14 +1527,17 @@ private fun WorkHeader(
     query: String,
     showSearch: Boolean,
     showQuietLink: Boolean,
+    showTitle: Boolean = true,
     onQuery: (String) -> Unit,
     onOpenWorkSettings: () -> Unit,
 ) {
     val focus = LocalFocusManager.current
-    Column(modifier = Modifier.padding(horizontal = 24.dp)) {
-        SectionTitle(text = stringResource(R.string.section_work))
+    Column(modifier = Modifier.padding(horizontal = FocoSpace.page)) {
+        if (showTitle) {
+            SectionTitle(text = stringResource(R.string.section_work))
+        }
         if (WorkCatalogRules.showQuietCopy(kind)) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(FocoSpace.gap))
             Text(
                 text = stringResource(R.string.work_quiet_title),
                 style = MaterialTheme.typography.bodyMedium,
@@ -966,7 +1550,7 @@ private fun WorkHeader(
             }
         }
         if (showSearch) {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(FocoSpace.gap))
             OutlinedTextField(
                 value = query,
                 onValueChange = onQuery,
@@ -995,7 +1579,7 @@ private fun WorkHeader(
                 ),
             )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(FocoSpace.gapLg))
     }
 }
 
@@ -1004,8 +1588,8 @@ private fun PersonalEmptyInline(onAddApps: () -> Unit, onOpenSystemSettings: () 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp)
-            .longPressEmpty(onOpenSystemSettings),
+            .padding(horizontal = FocoSpace.page)
+            .homeLongPress(onOpenSystemSettings),
     ) {
         Text(
             text = stringResource(R.string.home_empty),
@@ -1040,7 +1624,7 @@ private fun SheetAction(label: String, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 16.dp),
+            .padding(horizontal = FocoSpace.page, vertical = FocoSpace.section),
     )
 }
 
@@ -1049,6 +1633,8 @@ private data class HomeCell(
     val label: String,
     val icon: Bitmap? = null,
     val muted: Boolean = false,
+    val paused: Boolean = false,
+    val packageName: String? = null,
     val groupId: String? = null,
     val folderIcons: List<Bitmap?> = emptyList(),
     val memberLabels: List<String> = emptyList(),
@@ -1056,9 +1642,21 @@ private data class HomeCell(
     val key: String get() = if (groupId != null) "g:$groupId" else id
 }
 
-private fun LaunchableApp.toCell(): HomeCell = HomeCell(packageName, label, icon)
+private fun LaunchableApp.toCell(): HomeCell = HomeCell(
+    id = packageName,
+    label = label,
+    icon = icon,
+    packageName = packageName,
+)
 
-private fun WorkApp.toCell(icon: Bitmap?, muted: Boolean): HomeCell = HomeCell(key, label, icon, muted)
+private fun WorkApp.toCell(icon: Bitmap?, muted: Boolean, paused: Boolean = false): HomeCell = HomeCell(
+    id = key,
+    label = label,
+    icon = icon,
+    muted = muted,
+    paused = paused,
+    packageName = packageName,
+)
 
 private fun AppGroup.toCell(
     icons: List<Bitmap?>,
@@ -1137,7 +1735,7 @@ private fun AppRow(
     DisposableEffect(rowKey) {
         onDispose { drag.removeRow(rowKey) }
     }
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(FocoSpace.section))
 }
 
 @Composable
@@ -1173,7 +1771,7 @@ private fun AppCell(
         chrome.fromGroupId == fromGroupId &&
         cell.groupId == null
     val canDrag = dragApps && cell.groupId == null
-    val iconAlpha = if (cell.muted) 0.4f else 1f
+    val iconAlpha = if (cell.muted || cell.paused) 0.4f else 1f
     Column(
         modifier = modifier
             .then(
@@ -1225,10 +1823,11 @@ private fun AppCell(
             },
         )
         Spacer(Modifier.height(6.dp))
+        val pausedMark = stringResource(R.string.app_paused_mark)
         Text(
-            text = cell.label,
+            text = if (cell.paused) cell.label + "\n" + pausedMark else cell.label,
             style = MaterialTheme.typography.labelSmall,
-            color = if (cell.muted) FocoPaperDim else MaterialTheme.colorScheme.onBackground,
+            color = if (cell.muted || cell.paused) FocoPaperDim else MaterialTheme.colorScheme.onBackground,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
@@ -1408,17 +2007,25 @@ private fun MiniIcon(bitmap: Bitmap?) {
 @Composable
 private fun PersonalAppSheet(
     app: LaunchableApp,
+    paused: Boolean,
     onOpen: () -> Unit,
+    onPause: () -> Unit,
     onAddToGroup: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(bottom = FocoSpace.gapLg),
     ) {
         SheetTitle(app.label)
-        SheetAction(stringResource(R.string.lp_open), onOpen)
+        if (!paused) {
+            SheetAction(stringResource(R.string.lp_open), onOpen)
+        }
+        SheetAction(
+            stringResource(if (paused) R.string.app_resume else R.string.app_pause),
+            onPause,
+        )
         SheetAction(stringResource(R.string.group_add), onAddToGroup)
         SheetAction(stringResource(R.string.lp_remove), onRemove)
     }
@@ -1427,16 +2034,24 @@ private fun PersonalAppSheet(
 @Composable
 private fun WorkAppSheet(
     app: WorkApp,
+    paused: Boolean,
     onOpen: () -> Unit,
+    onPause: () -> Unit,
     onAddToGroup: () -> Unit,
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp),
+            .padding(bottom = FocoSpace.gapLg),
     ) {
         SheetTitle(app.label)
-        SheetAction(stringResource(R.string.lp_open), onOpen)
+        if (!paused) {
+            SheetAction(stringResource(R.string.lp_open), onOpen)
+        }
+        SheetAction(
+            stringResource(if (paused) R.string.app_resume else R.string.app_pause),
+            onPause,
+        )
         SheetAction(stringResource(R.string.group_add), onAddToGroup)
     }
 }
@@ -1524,7 +2139,7 @@ private fun MemberRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen)
-            .padding(horizontal = 24.dp, vertical = 8.dp),
+            .padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val alpha = if (muted) 0.4f else 1f
@@ -1568,7 +2183,7 @@ private fun SheetTitle(text: String) {
         text = text,
         style = MaterialTheme.typography.bodyLarge,
         color = FocoPaper,
-        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        modifier = Modifier.padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
     )
 }
 
@@ -1648,47 +2263,12 @@ private data class GroupNameRequest(
 )
 
 @Composable
-private fun Modifier.longPressEmpty(onLongClick: () -> Unit): Modifier {
+internal fun Modifier.homeLongPress(onLongClick: () -> Unit): Modifier {
     return this.combinedClickable(
         interactionSource = remember { MutableInteractionSource() },
         indication = null,
         onClick = {},
         onLongClick = onLongClick,
-    )
-}
-
-@Composable
-private fun PauseChips(
-    showWork: Boolean,
-    showAvisos: Boolean,
-    onResumeWork: () -> Unit,
-    onResumeAvisos: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.padding(horizontal = 24.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        if (showWork) {
-            PauseChip(stringResource(R.string.work_paused_chip), onResumeWork)
-        }
-        if (showAvisos) {
-            PauseChip(stringResource(R.string.nls_paused_chip), onResumeAvisos)
-        }
-    }
-}
-
-@Composable
-private fun PauseChip(label: String, onClick: () -> Unit) {
-    Text(
-        text = label,
-        modifier = Modifier
-            .clip(RoundedCornerShape(50))
-            .background(FocoInkElevated)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .semantics { contentDescription = label },
-        style = MaterialTheme.typography.bodyMedium,
-        color = FocoPaperDim,
     )
 }
 
@@ -1764,7 +2344,7 @@ private fun OpenFolderOverlay(
                 text = group.name,
                 style = MaterialTheme.typography.bodyLarge,
                 color = FocoPaper,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
             )
             cells.chunked(4).forEach { row ->
                 AppRow(

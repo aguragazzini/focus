@@ -13,8 +13,8 @@ android {
         applicationId = "com.foco.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 13
-        versionName = "0.7.2"
+        versionCode = 16
+        versionName = "0.9.1"
     }
 
     signingConfigs {
@@ -77,6 +77,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.security.crypto)
     debugImplementation(libs.androidx.compose.ui.tooling)
     testImplementation(libs.junit)
 }

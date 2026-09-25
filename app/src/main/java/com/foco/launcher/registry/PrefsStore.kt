@@ -64,6 +64,19 @@ class PrefsStore(context: Context) {
         update { it.copy(namesOnly = enabled) }
     }
 
+    suspend fun setPhonePaused(paused: Boolean) {
+        update { it.copy(phonePaused = paused) }
+    }
+
+    suspend fun setPackagePaused(packageName: String, paused: Boolean) {
+        if (packageName.isBlank()) return
+        update { prefs ->
+            val next = prefs.pausedPackages.toMutableSet()
+            if (paused) next.add(packageName) else next.remove(packageName)
+            prefs.copy(pausedPackages = next.toList())
+        }
+    }
+
     suspend fun setAllowNotif(packageName: String, allowed: Boolean) {
         update { prefs ->
             prefs.copy(

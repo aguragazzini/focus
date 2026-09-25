@@ -9,6 +9,11 @@ class VisibleCopyTest {
     @Test
     fun userFacingStringsHaveNoInternOrEnglishOffCopy() {
         val xml = File("src/main/res/values/strings.xml").readText()
+        assertTrue(xml.contains("<string name=\"santoral_vetus\">Vetus</string>"))
+        assertTrue(xml.contains("<string name=\"santoral_novus\">Novus</string>"))
+        assertFalse(xml.contains("Betus"))
+        assertFalse(xml.contains("Nobus"))
+        assertFalse(xml.contains(">1962<"))
         assertFalse(xml.contains("Semana"))
         assertFalse(xml.contains("2a"))
         assertFalse(xml.contains("laburo"))

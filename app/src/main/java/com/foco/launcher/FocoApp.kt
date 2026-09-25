@@ -4,6 +4,7 @@ import android.app.Application
 import com.foco.launcher.core.DietPlan
 import com.foco.launcher.core.HomeGlance
 import com.foco.launcher.core.Santoral1962
+import com.foco.launcher.core.SantoralNovus
 import com.foco.launcher.notification.FocoNotificationListener
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.NotificationAllowlistStore
@@ -11,6 +12,7 @@ import com.foco.launcher.notification.NotificationPolicyEngine
 import com.foco.launcher.registry.GroupMutations
 import com.foco.launcher.registry.GroupSection
 import com.foco.launcher.registry.PackageRegistry
+import com.foco.launcher.security.PinStore
 import com.foco.launcher.registry.PrefsStore
 import com.foco.launcher.work.WorkCatalog
 import kotlinx.coroutines.CoroutineScope
@@ -32,6 +34,8 @@ class FocoApp : Application() {
         private set
     lateinit var notificationPolicy: NotificationPolicyEngine
         private set
+    lateinit var pinStore: PinStore
+        private set
 
     private val _startupReady = MutableStateFlow(false)
 
@@ -44,8 +48,10 @@ class FocoApp : Application() {
         registry = PackageRegistry(this, prefsStore)
         workCatalog = WorkCatalog(this)
         notificationPolicy = NotificationPolicyEngine(this, prefsStore)
+        pinStore = PinStore(this)
         applicationScope.launch(Dispatchers.Default) {
             Santoral1962.load(this@FocoApp)
+            SantoralNovus.load(this@FocoApp)
             DietPlan.load(this@FocoApp)
             HomeGlance.refresh(this@FocoApp)
         }

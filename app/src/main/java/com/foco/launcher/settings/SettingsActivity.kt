@@ -15,6 +15,7 @@ import com.foco.launcher.FocoApp
 import com.foco.launcher.R
 import com.foco.launcher.core.FocoTheme
 import com.foco.launcher.core.LaunchController
+import com.foco.launcher.core.LauncherActivity
 import com.foco.launcher.notification.NlsStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -69,7 +70,12 @@ class SettingsActivity : ComponentActivity() {
                     onOpenWorkSettings = { LaunchController.openWorkProfileSettings(this) },
                     onWorkPaused = vm::setWorkSectionPaused,
                     onNotificationsPaused = vm::setNotificationsPaused,
+                    onPhonePaused = vm::setPhonePaused,
                     onNamesOnly = vm::setNamesOnly,
+                    onEditHome = {
+                        startActivity(LauncherActivity.editIntent(this))
+                        finish()
+                    },
                 )
             }
         }
