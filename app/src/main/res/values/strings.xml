@@ -170,7 +170,7 @@
     <string name="nls_banner_cta">Activar</string>
     <string name="nls_inactive">El filtro no está activo sin el permiso del sistema.</string>
 
-    <string name="group_add">Agregar a grupo</string>
+    <string name="group_add">Agrupar con…</string>
     <string name="group_new">Nuevo grupo…</string>
     <string name="group_name_title">Nombre del grupo</string>
     <string name="group_name_hint">Nombre del grupo</string>
@@ -180,7 +180,7 @@
     <string name="group_save">Guardar</string>
     <string name="group_delete">Eliminar grupo</string>
     <string name="group_delete_body">Las apps vuelven a la lista.</string>
-    <string name="group_remove">Quitar del grupo</string>
+    <string name="group_remove">Sacar del grupo</string>
     <string name="group_cd">Grupo %1$s</string>
 
     <string name="cd_app_icon">Ícono</string>
