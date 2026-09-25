@@ -286,6 +286,11 @@ private fun SettingsMain(
                         text = stringResource(R.string.settings_pause_note),
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = stringResource(R.string.settings_about_calendar),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                 }
             }
         }

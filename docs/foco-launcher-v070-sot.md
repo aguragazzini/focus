@@ -9,4 +9,6 @@ Product override on Camila §3.1: **Pausar avisos is silence.** While `notificat
 
 Trabajo folders only organize. Every work launchable stays on the list when the section is visible (Andrés A1). Pausar Trabajo hides the section and cancels work notifications in Foco. It does not write system quiet mode.
 
-Santoral, extra widgets, and AppWidgetHost are deferred past 0.7.0. The home under the clock is the date and the local battery/alarm glance. App icons stay on by default. `Mostrar solo nombres` stays opt-in and off until the user turns it on.
+The home santoral is the 1962 Missal, Vetus Ordo, rubrics of 1960, bundled offline in `app/src/main/assets/santoral_1962.json`. The home label is «Santoral». Layout: time, date, santoral, battery and next alarm, pause chips, Personal, Trabajo.
+
+App icons stay on by default. `Mostrar solo nombres` stays opt-in and off until the user turns it on. AppWidgetHost stays out.

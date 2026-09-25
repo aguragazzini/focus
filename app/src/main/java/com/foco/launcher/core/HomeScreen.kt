@@ -314,11 +314,22 @@ fun HomeScreen(
             ) {
                 item(key = "clock") {
                     Spacer(Modifier.height(12.dp))
+                    val catalog = remember(context) {
+                        runCatching {
+                            context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
+                                Santoral1962.parse(reader.readText())
+                            }
+                        }.getOrNull()
+                    }
                     HomeClock(
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
                         modifier = Modifier.padding(horizontal = 24.dp),
                         readGlance = { HomeGlance.line(context) },
+                        underDate = { date ->
+                            val feast = catalog?.let { Santoral1962.resolve(it, date) }
+                            if (feast != null) SantoralLine(feast)
+                        },
                     )
                     if (state.notificationsPaused || (state.workSectionPaused && state.hasWorkProfile)) {
                         Spacer(Modifier.height(16.dp))
