@@ -107,6 +107,11 @@
     <string name="settings_about_calendar">El santoral sigue el misal tradicional de 1962.</string>
     <string name="settings_pause_note">Pausar Trabajo no es la pausa del perfil de trabajo de Android. Pausar avisos no es el No molestar del teléfono.</string>
     <string name="santoral_label">Santoral</string>
+    <string name="diet_lunch">Almuerzo</string>
+    <string name="diet_dinner">Cena</string>
+    <string name="diet_breakfast">Desayuno</string>
+    <string name="diet_meal_line">%1$s · %2$s</string>
+    <string name="diet_alts">Para variar</string>
     <string name="settings_look">Apariencia</string>
     <string name="look_no_icons">Mostrar solo nombres</string>
     <string name="look_no_icons_sub">Oculta los íconos de las apps. Cuesta reconocerlas al principio; baja el estímulo visual.</string>

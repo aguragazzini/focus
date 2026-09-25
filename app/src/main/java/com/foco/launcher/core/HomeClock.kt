@@ -45,6 +45,7 @@ fun HomeClock(
     zone: ZoneId = ZoneId.systemDefault(),
     readGlance: () -> String? = { null },
     underDate: @Composable (LocalDate) -> Unit = {},
+    belowGlance: @Composable () -> Unit = {},
 ) {
     var now by remember { mutableLongStateOf(nowMillis()) }
     var glance by remember { mutableStateOf(HomeGlance.peek()?.trim()?.takeIf { it.isNotEmpty() }) }
@@ -128,5 +129,6 @@ fun HomeClock(
                 textAlign = TextAlign.Center,
             )
         }
+        belowGlance()
     }
 }

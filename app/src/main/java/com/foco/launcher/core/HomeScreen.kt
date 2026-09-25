@@ -330,6 +330,22 @@ fun HomeScreen(
                             val feast = catalog?.let { Santoral1962.resolve(it, date) }
                             if (feast != null) SantoralLine(feast)
                         },
+                        belowGlance = {
+                            val meals = remember(context) {
+                                DietPlan.peek() ?: runCatching {
+                                    context.assets.open("plan_ragazzini.json").bufferedReader().use { reader ->
+                                        DietPlan.parse(reader.readText())
+                                    }
+                                }.getOrNull()?.also { DietPlan.store(it) }
+                            }
+                            if (meals != null) {
+                                Spacer(Modifier.height(10.dp))
+                                DietGlance(
+                                    plan = meals,
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                )
+                            }
+                        },
                     )
                     if (state.notificationsPaused || (state.workSectionPaused && state.hasWorkProfile)) {
                         Spacer(Modifier.height(16.dp))

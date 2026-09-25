@@ -1,6 +1,7 @@
 package com.foco.launcher
 
 import android.app.Application
+import com.foco.launcher.core.DietPlan
 import com.foco.launcher.core.HomeGlance
 import com.foco.launcher.core.Santoral1962
 import com.foco.launcher.notification.FocoNotificationListener
@@ -45,6 +46,7 @@ class FocoApp : Application() {
         notificationPolicy = NotificationPolicyEngine(this, prefsStore)
         applicationScope.launch(Dispatchers.Default) {
             Santoral1962.load(this@FocoApp)
+            DietPlan.load(this@FocoApp)
             HomeGlance.refresh(this@FocoApp)
         }
         applicationScope.launch {
