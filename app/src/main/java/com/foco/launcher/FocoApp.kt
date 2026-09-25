@@ -1,6 +1,8 @@
 package com.foco.launcher
 
 import android.app.Application
+import com.foco.launcher.core.HomeGlance
+import com.foco.launcher.core.Santoral1962
 import com.foco.launcher.notification.FocoNotificationListener
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.NotificationAllowlistStore
@@ -41,6 +43,10 @@ class FocoApp : Application() {
         registry = PackageRegistry(this, prefsStore)
         workCatalog = WorkCatalog(this)
         notificationPolicy = NotificationPolicyEngine(this, prefsStore)
+        applicationScope.launch(Dispatchers.Default) {
+            Santoral1962.load(this@FocoApp)
+            HomeGlance.refresh(this@FocoApp)
+        }
         applicationScope.launch {
             try {
                 NotificationAllowlistStore.migrateInto(

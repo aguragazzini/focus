@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.MediaStore
 import android.provider.Settings
 import android.provider.Telephony
@@ -34,17 +35,49 @@ object SuggestedApps {
     }
 
     fun isPhone(context: Context, packageName: String): Boolean {
-        return phone(context, context.packageManager)?.packageName == packageName
+        return cachedPhone(context) == packageName
     }
 
     /** Package that resolves [android.provider.Settings.ACTION_SETTINGS], not a hardcoded OEM name. */
     fun settingsPackage(context: Context): String? {
-        return settings(context, context.packageManager)?.packageName
+        return cachedSettings(context)
+    }
+
+    /** Package install/remove can change the resolved dialer or settings app. */
+    fun invalidate() {
+        synchronized(cacheLock) { cachedAtMs = 0L }
     }
 
     fun isSystemSettings(context: Context, packageName: String): Boolean {
         return settingsPackage(context) == packageName
     }
+
+    private fun cachedPhone(context: Context): String? = synchronized(cacheLock) {
+        refreshCache(context)
+        cachedPhonePkg
+    }
+
+    private fun cachedSettings(context: Context): String? = synchronized(cacheLock) {
+        refreshCache(context)
+        cachedSettingsPkg
+    }
+
+    private fun refreshCache(context: Context) {
+        val now = SystemClock.elapsedRealtime()
+        if (cachedAtMs != 0L && now - cachedAtMs < RESOLVE_TTL_MS) return
+        val pm = context.applicationContext.packageManager
+        val app = context.applicationContext
+        cachedPhonePkg = phone(app, pm)?.packageName
+        cachedSettingsPkg = settings(app, pm)?.packageName
+        cachedAtMs = now
+    }
+
+    private val cacheLock = Any()
+
+    private const val RESOLVE_TTL_MS = 60_000L
+    private var cachedAtMs = 0L
+    private var cachedPhonePkg: String? = null
+    private var cachedSettingsPkg: String? = null
 
     private fun phone(context: Context, pm: PackageManager): SuggestedApp? {
         val intent = Intent(Intent.ACTION_DIAL).apply { data = Uri.parse("tel:") }

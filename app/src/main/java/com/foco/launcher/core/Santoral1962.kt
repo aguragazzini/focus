@@ -1,9 +1,11 @@
 package com.foco.launcher.core
 
+import android.content.Context
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.time.DayOfWeek
 import java.time.LocalDate
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Universal Roman calendar of the 1962 Missal (rubrics of 1960).
@@ -12,6 +14,24 @@ import java.time.LocalDate
  */
 object Santoral1962 {
     private val json = Json { ignoreUnknownKeys = true }
+    private val cached = AtomicReference<SantoralCatalog?>(null)
+
+    fun peek(): SantoralCatalog? = cached.get()
+
+    fun store(catalog: SantoralCatalog) {
+        cached.compareAndSet(null, catalog)
+    }
+
+    /** Parses the bundled asset off the caller thread. Safe to call more than once. */
+    fun load(context: Context) {
+        if (cached.get() != null) return
+        val catalog = runCatching {
+            context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
+                parse(reader.readText())
+            }
+        }.getOrNull() ?: return
+        cached.compareAndSet(null, catalog)
+    }
 
     fun parse(raw: String): SantoralCatalog = json.decodeFromString(raw)
 

@@ -315,11 +315,11 @@ fun HomeScreen(
                 item(key = "clock") {
                     Spacer(Modifier.height(12.dp))
                     val catalog = remember(context) {
-                        runCatching {
+                        Santoral1962.peek() ?: runCatching {
                             context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
                                 Santoral1962.parse(reader.readText())
                             }
-                        }.getOrNull()
+                        }.getOrNull()?.also { Santoral1962.store(it) }
                     }
                     HomeClock(
                         onOpenClock = onOpenClock,
@@ -583,7 +583,6 @@ fun HomeScreen(
                 workIcons = state.workIcons,
                 namesOnly = state.namesOnly,
                 workMuted = state.workKind == WorkSectionKind.Quiet,
-                scrimAlpha = if (drag.session?.fromGroupId == openGroup.id) 0.35f else 0.72f,
                 drag = drag,
                 onDismiss = { openedGroupId = null },
                 onPanelBounds = { drag.folderPanel = it },
@@ -613,14 +612,11 @@ fun HomeScreen(
             }
         }
 
-        val ghost = drag.session
-        if (ghost != null) {
-            DragGhost(
-                session = ghost,
-                namesOnly = state.namesOnly,
-                origin = ghostOrigin,
-            )
-        }
+        HomeDragGhost(
+            drag = drag,
+            namesOnly = state.namesOnly,
+            origin = ghostOrigin,
+        )
 
     val activeSheet = sheet
     if (activeSheet != null) {
@@ -1153,12 +1149,12 @@ private fun AppCell(
     DisposableEffect(tileKey) {
         onDispose { drag.removeTile(tileKey) }
     }
-    val session = drag.session
-    val highlight = highlightFor(session, cell.id, cell.groupId)
-    val lifted = session != null &&
-        session.section == section &&
-        session.memberId == cell.id &&
-        session.fromGroupId == fromGroupId &&
+    val chrome = drag.chrome
+    val highlight = highlightFor(chrome, cell.id, cell.groupId)
+    val lifted = chrome != null &&
+        chrome.section == section &&
+        chrome.memberId == cell.id &&
+        chrome.fromGroupId == fromGroupId &&
         cell.groupId == null
     val canDrag = dragApps && cell.groupId == null
     val iconAlpha = if (cell.muted) 0.4f else 1f
@@ -1374,8 +1370,9 @@ private fun MiniLetter(label: String?) {
 @Composable
 private fun MiniIcon(bitmap: Bitmap?) {
     if (bitmap != null) {
+        val image = remember(bitmap) { bitmap.asImageBitmap() }
         Image(
-            bitmap = bitmap.asImageBitmap(),
+            bitmap = image,
             contentDescription = null,
             modifier = Modifier
                 .size(18.dp)
@@ -1700,7 +1697,6 @@ private fun OpenFolderOverlay(
     workIcons: Map<String, Bitmap>,
     namesOnly: Boolean,
     workMuted: Boolean,
-    scrimAlpha: Float,
     drag: HomeDragState,
     onDismiss: () -> Unit,
     onPanelBounds: (GroupDrag.Bounds) -> Unit,
@@ -1712,6 +1708,7 @@ private fun OpenFolderOverlay(
     onDragEnd: () -> Unit,
     onEnsureMember: ((String) -> Unit)?,
 ) {
+    val scrimAlpha = if (drag.chrome?.fromGroupId == group.id) 0.35f else 0.72f
     val cells = when (group.section) {
         GroupSection.PERSONAL -> {
             val byPkg = personalApps.associateBy { it.packageName }
@@ -1783,10 +1780,16 @@ private fun OpenFolderOverlay(
 }
 
 @Composable
-private fun DragGhost(session: DragSession, namesOnly: Boolean, origin: Offset) {
+private fun HomeDragGhost(drag: HomeDragState, namesOnly: Boolean, origin: Offset) {
+    val pose = drag.ghost ?: return
+    DragGhost(pose = pose, namesOnly = namesOnly, origin = origin)
+}
+
+@Composable
+private fun DragGhost(pose: GhostPose, namesOnly: Boolean, origin: Offset) {
     val shape = RoundedCornerShape(12.dp)
-    val x = session.pointerX - origin.x - session.iconWidth / 2f
-    val y = session.pointerY - origin.y - session.iconHeight / 2f
+    val x = pose.pointerX - origin.x - pose.iconWidth / 2f
+    val y = pose.pointerY - origin.y - pose.iconHeight / 2f
     Box(
         modifier = Modifier
             .zIndex(5f)
@@ -1800,12 +1803,13 @@ private fun DragGhost(session: DragSession, namesOnly: Boolean, origin: Offset) 
             },
     ) {
         if (namesOnly) {
-            NameGlyph(label = session.label)
+            NameGlyph(label = pose.label)
         } else {
-            val bitmap = session.icon
-            if (bitmap != null) {
+            val bitmap = pose.icon
+            val image = if (bitmap != null) remember(bitmap) { bitmap.asImageBitmap() } else null
+            if (image != null) {
                 Image(
-                    bitmap = bitmap.asImageBitmap(),
+                    bitmap = image,
                     contentDescription = null,
                     modifier = Modifier
                         .size(48.dp)

@@ -68,11 +68,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         refreshDeviceFacts()
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             combine(
                 app.startupReady,
                 app.prefsStore.prefs,
-                app.registry.launchables,
+                app.registry.homeApps,
                 app.registry.loaded,
             ) { startupReady, prefs, all, iconsLoaded ->
                 StartupSnap(startupReady, prefs, all, iconsLoaded)

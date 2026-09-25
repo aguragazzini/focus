@@ -38,9 +38,34 @@ internal data class DragSession(
     val icon: Bitmap?,
 )
 
+internal data class DragChrome(
+    val section: GroupSection,
+    val memberId: String,
+    val fromGroupId: String?,
+    val hoverKind: GroupDrag.HoverKind,
+    val targetId: String?,
+    val overlapArmed: Boolean,
+)
+
+internal data class GhostPose(
+    val pointerX: Float,
+    val pointerY: Float,
+    val iconWidth: Float,
+    val iconHeight: Float,
+    val icon: Bitmap?,
+    val label: String,
+)
+
 internal class HomeDragState {
-    var session by mutableStateOf<DragSession?>(null)
+    /** Highlight + which tile is lifted. Changes when the hover target changes, not per pixel. */
+    var chrome by mutableStateOf<DragChrome?>(null)
         private set
+
+    /** Pointer pose for the ghost. Only the ghost composable should read this. */
+    var ghost by mutableStateOf<GhostPose?>(null)
+        private set
+
+    private var session: DragSession? = null
 
     val tiles = HashMap<String, GroupDrag.Tile>()
     val rows = HashMap<String, Pair<GroupSection, GroupDrag.Bounds>>()
@@ -48,25 +73,33 @@ internal class HomeDragState {
 
     private var hoverKey: String = ""
     private var hoverSince: Long = 0L
+    private var tileSnapshot: List<GroupDrag.Tile> = emptyList()
+    private var tileVersion = 0
+    private var tileSnapshotVersion = -1
+    private var gridSnapshot: Map<GroupSection, GroupDrag.Bounds> = emptyMap()
+    private var gridVersion = 0
+    private var gridSnapshotVersion = -1
 
     fun putTile(key: String, tile: GroupDrag.Tile) {
         val prev = tiles[key]
         if (prev == tile) return
         tiles[key] = tile
+        tileVersion++
     }
 
     fun removeTile(key: String) {
-        tiles.remove(key)
+        if (tiles.remove(key) != null) tileVersion++
     }
 
     fun putRow(key: String, section: GroupSection, bounds: GroupDrag.Bounds) {
         val prev = rows[key]
         if (prev != null && prev.first == section && nearly(prev.second, bounds)) return
         rows[key] = section to bounds
+        gridVersion++
     }
 
     fun removeRow(key: String) {
-        rows.remove(key)
+        if (rows.remove(key) != null) gridVersion++
     }
 
     fun start(
@@ -97,12 +130,29 @@ internal class HomeDragState {
             hover = GroupDrag.Hover(),
             icon = icon,
         )
+        chrome = DragChrome(
+            section = section,
+            memberId = memberId,
+            fromGroupId = fromGroupId,
+            hoverKind = GroupDrag.HoverKind.NONE,
+            targetId = null,
+            overlapArmed = false,
+        )
+        ghost = GhostPose(x, y, iconWidth, iconHeight, icon, label)
         move(x, y, nowMs)
     }
 
     fun move(windowX: Float, windowY: Float, nowMs: Long) {
         val current = session ?: return
         val dragged = GroupDrag.boundsCenteredOn(windowX, windowY, current.iconWidth, current.iconHeight)
+        if (tileSnapshotVersion != tileVersion) {
+            tileSnapshot = tiles.values.toList()
+            tileSnapshotVersion = tileVersion
+        }
+        if (gridSnapshotVersion != gridVersion) {
+            gridSnapshot = grids()
+            gridSnapshotVersion = gridVersion
+        }
         val raw = GroupDrag.evaluate(
             pointer = GroupDrag.Pointer(
                 section = current.section,
@@ -111,8 +161,8 @@ internal class HomeDragState {
                 bounds = dragged,
                 blockedTargetIds = current.blockedTargetIds,
             ),
-            tiles = tiles.values.toList(),
-            grids = grids(),
+            tiles = tileSnapshot,
+            grids = gridSnapshot,
             gridBlock = if (current.fromGroupId != null) folderPanel else null,
         )
         val key = "${raw.kind}:${raw.targetId.orEmpty()}"
@@ -120,11 +170,39 @@ internal class HomeDragState {
             hoverKey = key
             hoverSince = nowMs
         }
+        val hover = raw.copy(dwellMs = (nowMs - hoverSince).coerceAtLeast(0L))
         session = current.copy(
             pointerX = windowX,
             pointerY = windowY,
-            hover = raw.copy(dwellMs = (nowMs - hoverSince).coerceAtLeast(0L)),
+            hover = hover,
         )
+        val armed = hover.overlap >= GroupDrag.MIN_OVERLAP
+        val shown = chrome
+        if (shown == null ||
+            shown.hoverKind != hover.kind ||
+            shown.targetId != hover.targetId ||
+            shown.overlapArmed != armed
+        ) {
+            chrome = DragChrome(
+                section = current.section,
+                memberId = current.memberId,
+                fromGroupId = current.fromGroupId,
+                hoverKind = hover.kind,
+                targetId = hover.targetId,
+                overlapArmed = armed,
+            )
+        }
+        val pose = ghost
+        if (pose == null || pose.pointerX != windowX || pose.pointerY != windowY) {
+            ghost = GhostPose(
+                pointerX = windowX,
+                pointerY = windowY,
+                iconWidth = current.iconWidth,
+                iconHeight = current.iconHeight,
+                icon = current.icon,
+                label = current.label,
+            )
+        }
     }
 
     fun finish(): Pair<DragSession, GroupDrag.Action>? {
@@ -140,6 +218,8 @@ internal class HomeDragState {
 
     private fun clear() {
         session = null
+        chrome = null
+        ghost = null
         hoverKey = ""
         hoverSince = 0L
     }
@@ -168,18 +248,18 @@ internal class HomeDragState {
 }
 
 internal fun highlightFor(
-    session: DragSession?,
+    chrome: DragChrome?,
     cellId: String,
     cellGroupId: String?,
 ): CellHighlight {
-    val hover = session?.hover ?: return CellHighlight.None
-    val target = hover.targetId ?: return CellHighlight.None
+    if (chrome == null) return CellHighlight.None
+    val target = chrome.targetId ?: return CellHighlight.None
     val matchesFolder = cellGroupId != null && cellGroupId == target
     val matchesApp = cellGroupId == null && cellId == target
     if (!matchesFolder && !matchesApp) return CellHighlight.None
-    if (hover.kind == GroupDrag.HoverKind.INVALID_CROSS) return CellHighlight.Invalid
-    if (hover.overlap < GroupDrag.MIN_OVERLAP) return CellHighlight.None
-    return when (hover.kind) {
+    if (chrome.hoverKind == GroupDrag.HoverKind.INVALID_CROSS) return CellHighlight.Invalid
+    if (!chrome.overlapArmed) return CellHighlight.None
+    return when (chrome.hoverKind) {
         GroupDrag.HoverKind.VALID_APP -> if (matchesApp) CellHighlight.Valid else CellHighlight.None
         GroupDrag.HoverKind.VALID_FOLDER -> if (matchesFolder) CellHighlight.Valid else CellHighlight.None
         else -> CellHighlight.None
