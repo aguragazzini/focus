@@ -14,6 +14,9 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -49,13 +52,16 @@ fun HomeClock(
 ) {
     var now by remember { mutableLongStateOf(nowMillis()) }
     var glance by remember { mutableStateOf(HomeGlance.peek()?.trim()?.takeIf { it.isNotEmpty() }) }
-    LaunchedEffect(zone) {
-        while (true) {
-            val current = nowMillis()
-            now = current
-            val remainder = Math.floorMod(current, 60_000L)
-            val wait = if (remainder == 0L) 60_000L else 60_000L - remainder
-            delay(wait.coerceIn(250L, 60_000L))
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(lifecycle, zone) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                val current = nowMillis()
+                now = current
+                val remainder = Math.floorMod(current, 60_000L)
+                val wait = if (remainder == 0L) 60_000L else 60_000L - remainder
+                delay(wait.coerceIn(250L, 60_000L))
+            }
         }
     }
     LaunchedEffect(now, zone) {
@@ -82,7 +88,7 @@ fun HomeClock(
                     role = Role.Button
                     onClick { onOpenClock(); true }
                 }
-                .padding(horizontal = 12.dp, vertical = 2.dp),
+                .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.hair),
             style = TextStyle(
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Light,
@@ -92,7 +98,7 @@ fun HomeClock(
             ),
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(FocoSpace.hair))
         Text(
             text = date,
             modifier = Modifier
@@ -102,7 +108,7 @@ fun HomeClock(
                     role = Role.Button
                     onClick { onOpenCalendar(); true }
                 }
-                .padding(horizontal = 12.dp, vertical = 2.dp),
+                .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.hair),
             style = TextStyle(
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Normal,
@@ -112,7 +118,7 @@ fun HomeClock(
             ),
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(FocoSpace.gap))
         underDate(day)
         if (!glance.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))

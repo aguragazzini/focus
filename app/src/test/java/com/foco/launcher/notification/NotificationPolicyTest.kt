@@ -260,4 +260,56 @@ class NotificationPolicyTest {
         assertTrue(NotificationPolicy.isProtectedSystemOrOem("com.android.settings"))
         assertFalse(NotificationPolicy.isProtectedSystemOrOem("com.motorola.camera3"))
     }
+
+    @Test
+    fun phonePauseCancelsEverythingTheListenerCanSee() {
+        val call = personal.copy(category = NotificationPolicy.CATEGORY_CALL)
+        val system = personal.copy(packageName = "com.android.systemui")
+        assertTrue(
+            NotificationPolicy.shouldSuppress(
+                facts = call,
+                nlsFilterEnabled = false,
+                allowlist = emptySet(),
+                phonePaused = true,
+            ),
+        )
+        assertTrue(
+            NotificationPolicy.shouldSuppress(
+                facts = system,
+                nlsFilterEnabled = false,
+                allowlist = emptySet(),
+                phonePaused = true,
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = call,
+                nlsFilterEnabled = false,
+                allowlist = emptySet(),
+                phonePaused = true,
+                listenerGranted = false,
+            ),
+        )
+    }
+
+    @Test
+    fun pausedPackageCancelsThatPackageIncludingMedia() {
+        val media = personal.copy(isMediaStyle = true)
+        assertTrue(
+            NotificationPolicy.shouldSuppress(
+                facts = media,
+                nlsFilterEnabled = false,
+                allowlist = setOf(media.packageName),
+                pausedPackages = setOf(media.packageName),
+            ),
+        )
+        assertFalse(
+            NotificationPolicy.shouldSuppress(
+                facts = personal,
+                nlsFilterEnabled = false,
+                allowlist = setOf(personal.packageName),
+                pausedPackages = setOf("com.other"),
+            ),
+        )
+    }
 }

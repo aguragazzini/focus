@@ -1,5 +1,7 @@
 # Diet glance — 0.7.2
 
+0.8.0 moved this off the clock. The meals are the Comida page. See `docs/foco-home-pages-v080.md`. The asset and `DietPlan` are the same.
+
 Local home line for Agus's weekday meals. Same stack as the clock, santoral, and battery glance. No widget host, no network, no streaks.
 
 ## Placement

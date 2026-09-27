@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,24 +39,35 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.foco.launcher.R
+import com.foco.launcher.core.AgendaAccess
 import com.foco.launcher.core.FocoInk
 import com.foco.launcher.core.FocoLine
 import com.foco.launcher.core.FocoPaper
 import com.foco.launcher.core.FocoPaperDim
 import com.foco.launcher.core.FocoPrimaryButton
+import com.foco.launcher.core.FocoSpace
 import com.foco.launcher.core.FocoTextButton
 import com.foco.launcher.core.LaunchpadRules
 import com.foco.launcher.registry.LaunchableApp
+import com.foco.launcher.security.PinSettingsRow
 import com.foco.launcher.work.WorkCatalogRules
 import com.foco.launcher.work.WorkSettingsStatus
 
@@ -86,7 +98,10 @@ fun SettingsHost(
     onOpenWorkSettings: () -> Unit,
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
+    onEditHome: () -> Unit,
+    onRequestCalendar: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -102,7 +117,10 @@ fun SettingsHost(
             onOpenWorkSettings = onOpenWorkSettings,
             onWorkPaused = onWorkPaused,
             onNotificationsPaused = onNotificationsPaused,
+            onPhonePaused = onPhonePaused,
             onNamesOnly = onNamesOnly,
+            onEditHome = onEditHome,
+            onRequestCalendar = onRequestCalendar,
         )
         SettingsDest.Edit -> EditAppsScreen(
             state = state,
@@ -159,8 +177,19 @@ private fun SettingsMain(
     onOpenWorkSettings: () -> Unit,
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
+    onEditHome: () -> Unit,
+    onRequestCalendar: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var calendarGranted by remember { mutableStateOf(AgendaAccess.granted(context)) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            calendarGranted = AgendaAccess.granted(context)
+        }
+    }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
@@ -209,6 +238,19 @@ private fun SettingsMain(
                         checked = state.namesOnly,
                         onCheckedChange = onNamesOnly,
                     )
+                    SettingsRow(
+                        title = stringResource(R.string.settings_home),
+                        subtitle = stringResource(R.string.settings_home_sub),
+                        onClick = onEditHome,
+                    )
+                    SettingsRow(
+                        title = stringResource(R.string.settings_agenda),
+                        subtitle = stringResource(
+                            if (calendarGranted) R.string.settings_agenda_on else R.string.settings_agenda_need,
+                        ),
+                        onClick = onRequestCalendar,
+                    )
+                    PinSettingsRow()
                 }
                 HorizontalDivider()
                 Column(modifier = Modifier.padding(top = 8.dp)) {
@@ -231,6 +273,12 @@ private fun SettingsMain(
                         subtitle = stringResource(R.string.nls_pause_sub),
                         checked = state.notificationsPaused,
                         onCheckedChange = onNotificationsPaused,
+                    )
+                    SettingsSwitchRow(
+                        title = stringResource(R.string.phone_pause),
+                        subtitle = stringResource(R.string.phone_pause_sub),
+                        checked = state.phonePaused,
+                        onCheckedChange = onPhonePaused,
                     )
                 }
                 SettingsRow(
@@ -402,13 +450,13 @@ private fun SettingsSwitchRow(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    horizontalInset: Dp = 20.dp,
+    horizontalInset: Dp = FocoSpace.page,
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = horizontalInset, vertical = 8.dp),
+            .padding(horizontal = horizontalInset, vertical = FocoSpace.gap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
@@ -610,11 +658,14 @@ private fun AddAppsScreen(
             )
         },
         bottomBar = {
+            // Scaffold pins this slot to the physical bottom and does not inset it.
+            // The nav padding is part of the measured bar, so the list stops above it.
             FocoPrimaryButton(
                 onClick = onConfirmAdd,
                 enabled = state.pendingAdd.isNotEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .padding(16.dp),
             ) {
                 Text(stringResource(R.string.add_done))

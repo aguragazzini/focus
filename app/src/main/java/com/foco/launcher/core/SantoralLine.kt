@@ -14,7 +14,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -27,14 +26,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.foco.launcher.R
-
 @Composable
-fun SantoralLine(day: SantoralDay, modifier: Modifier = Modifier) {
+fun SantoralLine(
+    day: SantoralDay,
+    label: String,
+    modifier: Modifier = Modifier,
+    novus: Boolean = false,
+) {
     var open by rememberSaveable { mutableStateOf(false) }
-    val label = stringResource(R.string.santoral_label)
+    val detail = santoralDetail(day, novus)
     val spoken = buildString {
-        append(label).append(". ").append(day.name).append(". ").append(day.summary)
+        append(label).append(". ").append(day.name)
+        if (detail.isNotBlank()) append(". ").append(detail)
         if (day.note.isNotBlank()) append(' ').append(day.note)
     }
     Column(
@@ -46,7 +49,7 @@ fun SantoralLine(day: SantoralDay, modifier: Modifier = Modifier) {
                 role = Role.Button
                 onClick { open = !open; true }
             }
-            .padding(horizontal = 12.dp, vertical = 2.dp),
+            .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.hair),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -61,7 +64,7 @@ fun SantoralLine(day: SantoralDay, modifier: Modifier = Modifier) {
             ),
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(2.dp))
+        Spacer(Modifier.height(FocoSpace.hair))
         Text(
             text = day.name,
             style = TextStyle(
@@ -73,8 +76,7 @@ fun SantoralLine(day: SantoralDay, modifier: Modifier = Modifier) {
             ),
             textAlign = TextAlign.Center,
         )
-        val detail = if (day.rank != null) "${day.rank} clase · ${day.summary}" else day.summary
-        Text(
+        if (detail.isNotBlank()) Text(
             text = detail,
             modifier = Modifier.padding(top = 2.dp),
             style = TextStyle(
@@ -104,5 +106,24 @@ fun SantoralLine(day: SantoralDay, modifier: Modifier = Modifier) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
+    }
+}
+
+private fun santoralDetail(day: SantoralDay, novus: Boolean): String {
+    if (!novus) {
+        return if (day.rank != null) "${day.rank} clase · ${day.summary}" else day.summary
+    }
+    val rankWord = when (day.rank) {
+        "S" -> "Solemnidad"
+        "F" -> "Fiesta"
+        "M" -> "Memoria"
+        "O" -> "Memoria libre"
+        "A" -> "Conmemoración"
+        else -> null
+    }
+    return when {
+        rankWord != null && day.summary.isNotBlank() -> "$rankWord · ${day.summary}"
+        rankWord != null -> rankWord
+        else -> day.summary
     }
 }

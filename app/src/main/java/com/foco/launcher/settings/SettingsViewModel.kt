@@ -64,6 +64,7 @@ data class SettingsUiState(
     val workNote: String? = null,
     val workSectionPaused: Boolean = false,
     val notificationsPaused: Boolean = false,
+    val phonePaused: Boolean = false,
     val namesOnly: Boolean = false,
 )
 
@@ -250,6 +251,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun setPhonePaused(paused: Boolean) {
+        viewModelScope.launch {
+            app.prefsStore.setPhonePaused(paused)
+        }
+    }
+
     fun setNamesOnly(enabled: Boolean) {
         viewModelScope.launch {
             app.prefsStore.setNamesOnly(enabled)
@@ -369,6 +376,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             nlsMessage = message,
             workSectionPaused = core.prefs.workSectionPaused,
             notificationsPaused = core.prefs.notificationsPaused,
+            phonePaused = core.prefs.phonePaused,
             namesOnly = core.prefs.namesOnly,
         )
     }

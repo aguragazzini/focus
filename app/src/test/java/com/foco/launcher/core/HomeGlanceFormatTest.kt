@@ -49,8 +49,10 @@ class HomeGlanceFormatTest {
         assertFalse(blob.contains("http"))
         assertFalse(blob.contains("weather"))
         val manifest = File("src/main/AndroidManifest.xml").readText()
-        assertFalse(manifest.contains("READ_CALENDAR"))
+        assertTrue(manifest.contains("READ_CALENDAR"))
         assertFalse(manifest.contains("INTERNET"))
+        val agenda = File("src/main/java/com/foco/launcher/core/AgendaAccess.kt").readText()
+        assertTrue(agenda.contains("READ_CALENDAR"))
     }
 
     private fun at(year: Int, month: Int, day: Int, hour: Int, minute: Int): Long {

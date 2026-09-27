@@ -28,12 +28,18 @@ class NotificationPolicyEngine(
                     packages = prefs.notificationAllowlist,
                     workSectionPaused = prefs.workSectionPaused,
                     notificationsPaused = prefs.notificationsPaused,
+                    phonePaused = prefs.phonePaused,
+                    pausedPackages = prefs.pausedPackages.toSet(),
                 )
                 val prev = snapshot.getAndSet(next)
                 if (next.nlsFilterEnabled && !prev.nlsFilterEnabled && NlsStatus.isGranted(appContext)) {
                     NlsStatus.requestRebind(appContext)
                 }
-                val suppressActive = next.nlsFilterEnabled || next.workSectionPaused || next.notificationsPaused
+                val suppressActive = next.nlsFilterEnabled ||
+                    next.workSectionPaused ||
+                    next.notificationsPaused ||
+                    next.phonePaused ||
+                    next.pausedPackages.isNotEmpty()
                 if (suppressActive && next != prev) {
                     FocoNotificationListener.scrubIfConnected()
                 }
@@ -61,6 +67,8 @@ class NotificationPolicyEngine(
             listenerGranted = NlsStatus.isGranted(appContext),
             workSectionPaused = current.workSectionPaused,
             notificationsPaused = current.notificationsPaused,
+            phonePaused = current.phonePaused,
+            pausedPackages = current.pausedPackages,
         )
     }
 
@@ -69,5 +77,7 @@ class NotificationPolicyEngine(
         val packages: Set<String> = emptySet(),
         val workSectionPaused: Boolean = false,
         val notificationsPaused: Boolean = false,
+        val phonePaused: Boolean = false,
+        val pausedPackages: Set<String> = emptySet(),
     )
 }

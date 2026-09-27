@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.Assert.assertNotEquals
 import java.time.ZoneOffset
 import java.time.ZonedDateTime
 
@@ -23,6 +24,16 @@ class HomeClockFormatTest {
         assertEquals("00:05", HomeClockFormat.time(midnight.toInstant().toEpochMilli(), zone))
         assertEquals("dom 27 sep", HomeClockFormat.date(midnight.toInstant().toEpochMilli(), zone))
         assertFalse(HomeClockFormat.time(midnight.toInstant().toEpochMilli(), zone).contains("59"))
+    }
+
+    @Test
+    fun cordobaMidnightChangesTheCivilDate() {
+        val zone = HomeClockFormat.CIVIL_ZONE
+        val before = ZonedDateTime.of(2026, 9, 25, 23, 59, 0, 0, zone).toInstant().toEpochMilli()
+        val after = ZonedDateTime.of(2026, 9, 26, 0, 1, 0, 0, zone).toInstant().toEpochMilli()
+        assertNotEquals(HomeClockFormat.date(before, zone), HomeClockFormat.date(after, zone))
+        assertEquals("vie 25 sep", HomeClockFormat.date(before, zone))
+        assertEquals("sáb 26 sep", HomeClockFormat.date(after, zone))
     }
 
     @Test

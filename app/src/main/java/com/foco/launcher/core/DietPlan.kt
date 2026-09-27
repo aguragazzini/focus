@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.temporal.TemporalAdjusters
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -75,6 +76,12 @@ object DietPlan {
 
     fun homeTitle(day: DietDay): String {
         return if (day.weekend) day.theme else "Hoy · ${day.theme}"
+    }
+
+    /** The [day] that falls in the same Monday–Sunday week as [today]. */
+    fun dateInWeek(today: LocalDate, day: DayOfWeek): LocalDate {
+        val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        return monday.plusDays(day.value.toLong() - 1)
     }
 }
 
