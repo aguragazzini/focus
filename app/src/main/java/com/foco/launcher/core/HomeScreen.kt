@@ -141,6 +141,10 @@ fun HomeScreen(
     onOpenAvisos: () -> Unit,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onRequestCalendar: () -> Unit = {},
+    onOpenAppSettings: () -> Unit = {},
+    onOpenAgendaEvent: (AgendaEvent) -> Unit = {},
+    onOpenWorkCalendar: () -> Unit = {},
     onRefreshWork: () -> Unit,
     onRemovePersonal: (String) -> Unit,
     onCreateGroup: (GroupSection, String, String) -> Unit,
@@ -368,6 +372,15 @@ fun HomeScreen(
                     HomePages.TYPE_CLOCK -> ClockHomePage(
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
+                        onOpenSystemSettings = onOpenSystemSettings,
+                    )
+                    HomePages.TYPE_AGENDA -> AgendaHomePage(
+                        title = spec.label,
+                        hasWorkProfile = state.hasWorkProfile,
+                        onRequestPermission = onRequestCalendar,
+                        onOpenAppSettings = onOpenAppSettings,
+                        onOpenEvent = onOpenAgendaEvent,
+                        onOpenWorkCalendar = onOpenWorkCalendar,
                         onOpenSystemSettings = onOpenSystemSettings,
                     )
                     HomePages.TYPE_PERSONAL -> PersonalHomePage(
@@ -854,6 +867,7 @@ private fun HomeEditSheet(
 private fun HomePageTypePicker(onPick: (String, String) -> Unit) {
     val types = listOf(
         HomePages.TYPE_CLOCK to R.string.page_clock,
+        HomePages.TYPE_AGENDA to R.string.page_agenda,
         HomePages.TYPE_PERSONAL to R.string.section_personal,
         HomePages.TYPE_APPS to R.string.home_page_apps,
         HomePages.TYPE_DIET to R.string.page_diet,
@@ -1317,6 +1331,7 @@ private fun pageLabel(page: HomePageSpec): String {
     return stringResource(
         when (page.type) {
             HomePages.TYPE_CLOCK -> R.string.page_clock
+            HomePages.TYPE_AGENDA -> R.string.page_agenda
             HomePages.TYPE_PERSONAL -> R.string.section_personal
             HomePages.TYPE_DIET -> R.string.page_diet
             HomePages.TYPE_WORK -> R.string.section_work

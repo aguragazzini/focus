@@ -7,12 +7,14 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.foco.launcher.FocoApp
 import com.foco.launcher.R
+import com.foco.launcher.core.AgendaAccess
 import com.foco.launcher.core.FocoTheme
 import com.foco.launcher.core.LaunchController
 import com.foco.launcher.core.LauncherActivity
@@ -23,6 +25,9 @@ import kotlinx.coroutines.withContext
 
 class SettingsActivity : ComponentActivity() {
     private val vm: SettingsViewModel by viewModels { SettingsViewModel.factory(application as FocoApp) }
+    private val calendarPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,6 +81,7 @@ class SettingsActivity : ComponentActivity() {
                         startActivity(LauncherActivity.editIntent(this))
                         finish()
                     },
+                    onRequestCalendar = { AgendaAccess.request(this, calendarPermission) },
                 )
             }
         }

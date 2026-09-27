@@ -1,11 +1,17 @@
 package com.foco.launcher.core
 
+import android.content.ComponentName
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
-import android.provider.Settings
 import android.net.Uri
+import android.os.Build
+import android.os.Process
+import android.os.UserHandle
+import android.provider.CalendarContract
+import android.provider.Settings
 import com.foco.launcher.registry.PackageRegistry
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkApp
@@ -57,6 +63,75 @@ object LaunchController {
 
     /** Calendar app if one resolves. No-op when the device has none. */
     fun openCalendar(context: Context): Boolean = openLink(context, SystemAppLinks.calendarCandidates())
+
+    /**
+     * Opens the event, then the civil day, then the calendar app.
+     * A work event tries the managed-profile viewer first, then the work calendar app.
+     */
+    fun openAgendaEvent(
+        context: Context,
+        eventId: Long,
+        begin: Long,
+        end: Long,
+        allDay: Boolean,
+        work: Boolean,
+    ): Boolean {
+        if (work) {
+            if (Build.VERSION.SDK_INT >= 29) {
+                val opened = runCatching {
+                    CalendarContract.startViewCalendarEventInManagedProfile(
+                        context,
+                        eventId,
+                        begin,
+                        end,
+                        allDay,
+                        0,
+                    )
+                }.getOrDefault(false)
+                if (opened) return true
+            }
+            if (openWorkCalendar(context)) return true
+        }
+        val eventUri = ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, eventId)
+        val view = Intent(Intent.ACTION_VIEW).setData(eventUri).apply {
+            putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, begin)
+            putExtra(CalendarContract.EXTRA_EVENT_END_TIME, end)
+            putExtra(CalendarContract.EXTRA_EVENT_ALL_DAY, allDay)
+        }
+        if (ResolvedStart.start(context, view)) return true
+        val day = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
+        ContentUris.appendId(day, begin)
+        if (ResolvedStart.start(context, Intent(Intent.ACTION_VIEW).setData(day.build()))) return true
+        return if (work) false else openCalendar(context)
+    }
+
+    /** Calendar app inside the work profile. Fails soft when none resolves. */
+    fun openWorkCalendar(context: Context): Boolean {
+        val apps = context.getSystemService(LauncherApps::class.java) ?: return false
+        val users = runCatching {
+            apps.profiles.filter { it != Process.myUserHandle() }
+        }.getOrDefault(emptyList())
+        if (users.isEmpty()) return false
+        val probe = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR)
+        for (user in users) {
+            val info = runCatching { apps.resolveActivity(probe, user) }.getOrNull()
+            if (info != null && startWork(apps, info.componentName, user)) return true
+        }
+        for (pkg in listOf("com.google.android.calendar", "com.android.calendar")) {
+            for (user in users) {
+                val info = runCatching { apps.getActivityList(pkg, user).firstOrNull() }.getOrNull() ?: continue
+                if (startWork(apps, info.componentName, user)) return true
+            }
+        }
+        return false
+    }
+
+    private fun startWork(apps: LauncherApps, component: ComponentName, user: UserHandle): Boolean {
+        return runCatching {
+            apps.startMainActivity(component, user, null, null)
+            true
+        }.getOrDefault(false)
+    }
 
     fun workProfileSettingsResolves(context: Context): Boolean {
         return WorkSettingsLink.shouldOffer(resolveWorkSettings(context))

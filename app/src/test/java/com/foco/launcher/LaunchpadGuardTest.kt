@@ -76,10 +76,16 @@ class LaunchpadGuardTest {
         assertTrue(src.contains("home_edit"))
         val defaults = HomePages.defaults()
         assertEquals(
-            listOf(HomePages.TYPE_CLOCK, HomePages.TYPE_PERSONAL, HomePages.TYPE_DIET, HomePages.TYPE_WORK),
+            listOf(
+                HomePages.TYPE_CLOCK,
+                HomePages.TYPE_AGENDA,
+                HomePages.TYPE_PERSONAL,
+                HomePages.TYPE_DIET,
+                HomePages.TYPE_WORK,
+            ),
             defaults.map { it.type },
         )
-        assertEquals(1, HomePages.landingIndex(HomePages.visible(defaults)))
+        assertEquals(2, HomePages.landingIndex(HomePages.visible(defaults)))
         val clockFn = src.substringAfter("fun ClockHomePage").substringBefore("fun PersonalHomePage")
         assertTrue(clockFn.contains("HomeClock"))
         assertTrue(clockFn.contains("santoral_1962.json"))

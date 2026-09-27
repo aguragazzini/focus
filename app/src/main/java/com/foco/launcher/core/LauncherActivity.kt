@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,6 +30,9 @@ class LauncherActivity : ComponentActivity() {
     private var requestEdit by mutableStateOf(false)
     private var pinAction by mutableStateOf<(() -> Unit)?>(null)
     private var pinWrong by mutableStateOf(false)
+    private val calendarPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         requestEdit = intent.getBooleanExtra(EXTRA_EDIT_HOME, false)
@@ -83,6 +87,28 @@ class LauncherActivity : ComponentActivity() {
                     },
                     onOpenClock = { guardLaunch(null) { LaunchController.openClock(this@LauncherActivity) } },
                     onOpenCalendar = { guardLaunch(null) { LaunchController.openCalendar(this@LauncherActivity) } },
+                    onRequestCalendar = { AgendaAccess.request(this@LauncherActivity, calendarPermission) },
+                    onOpenAppSettings = {
+                        if (!LaunchController.openAppDetails(this@LauncherActivity)) vm.showOpenFail()
+                    },
+                    onOpenAgendaEvent = { event ->
+                        guardLaunch(null) {
+                            val opened = LaunchController.openAgendaEvent(
+                                this@LauncherActivity,
+                                event.eventId,
+                                event.beginMillis,
+                                event.endMillis,
+                                event.allDay,
+                                event.side == AgendaSide.WORK,
+                            )
+                            if (!opened) vm.showOpenFail()
+                        }
+                    },
+                    onOpenWorkCalendar = {
+                        guardLaunch(null) {
+                            if (!LaunchController.openWorkCalendar(this@LauncherActivity)) vm.showOpenFail()
+                        }
+                    },
                     onEditApps = { openFocoSettings(SettingsActivity.DEST_EDIT) },
                     onAddApps = { openFocoSettings(SettingsActivity.DEST_ADD) },
                     onChooseDefault = {

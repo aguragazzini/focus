@@ -3,8 +3,8 @@ package com.foco.launcher.registry
 import kotlinx.serialization.Serializable
 
 /**
- * Home pager layout. An empty stored list means the default four pages.
- * Several pages may share a type: they read the same clock, whitelist, diet, or work catalog.
+ * Home pager layout. An empty stored list means the default five pages.
+ * Several pages may share a type: they read the same clock, agenda, whitelist, diet, or work catalog.
  * APPS is the personal grid without Pausar avisos. It is not a second whitelist.
  */
 @Serializable
@@ -17,16 +17,18 @@ data class HomePageSpec(
 
 object HomePages {
     const val TYPE_CLOCK = "CLOCK"
+    const val TYPE_AGENDA = "AGENDA"
     const val TYPE_PERSONAL = "PERSONAL"
     const val TYPE_DIET = "DIET"
     const val TYPE_WORK = "WORK"
     const val TYPE_APPS = "APPS"
     const val MAX = 12
 
-    val TYPES = setOf(TYPE_CLOCK, TYPE_PERSONAL, TYPE_DIET, TYPE_WORK, TYPE_APPS)
+    val TYPES = setOf(TYPE_CLOCK, TYPE_AGENDA, TYPE_PERSONAL, TYPE_DIET, TYPE_WORK, TYPE_APPS)
 
     fun defaults(): List<HomePageSpec> = listOf(
         HomePageSpec(id = "page-clock", type = TYPE_CLOCK),
+        HomePageSpec(id = "page-agenda", type = TYPE_AGENDA),
         HomePageSpec(id = "page-personal", type = TYPE_PERSONAL),
         HomePageSpec(id = "page-diet", type = TYPE_DIET),
         HomePageSpec(id = "page-work", type = TYPE_WORK),
@@ -45,7 +47,24 @@ object HomePages {
             cleaned += spec.copy(id = id, type = type, label = label)
         }
         if (cleaned.isEmpty() || cleaned.none { !it.hidden }) return defaults()
-        return cleaned
+        return legacyDefaultWithAgenda(cleaned)
+    }
+
+    /**
+     * The 0.9.2 default four, stored as-is, gains Agenda after Reloj.
+     * A renamed, reordered, hidden, or extra page is left alone.
+     */
+    private fun legacyDefaultWithAgenda(pages: List<HomePageSpec>): List<HomePageSpec> {
+        if (pages.any { it.type == TYPE_AGENDA }) return pages
+        val legacyIds = listOf("page-clock", "page-personal", "page-diet", "page-work")
+        val legacyTypes = listOf(TYPE_CLOCK, TYPE_PERSONAL, TYPE_DIET, TYPE_WORK)
+        val untouched = pages.size == 4 &&
+            pages.map { it.id } == legacyIds &&
+            pages.map { it.type } == legacyTypes &&
+            pages.all { it.label.isEmpty() && !it.hidden }
+        if (!untouched) return pages
+        val agenda = HomePageSpec(id = "page-agenda", type = TYPE_AGENDA)
+        return listOf(pages[0], agenda) + pages.drop(1)
     }
 
     fun visible(pages: List<HomePageSpec>): List<HomePageSpec> = pages.filter { !it.hidden }

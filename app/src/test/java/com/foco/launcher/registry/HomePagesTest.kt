@@ -9,11 +9,12 @@ import org.junit.Test
 
 class HomePagesTest {
     @Test
-    fun defaultsAreTheFourPagesLandingOnPersonal() {
+    fun defaultsAreClockAgendaPersonalDietWorkLandingOnPersonal() {
         val pages = HomePages.defaults()
         assertEquals(
             listOf(
                 HomePages.TYPE_CLOCK,
+                HomePages.TYPE_AGENDA,
                 HomePages.TYPE_PERSONAL,
                 HomePages.TYPE_DIET,
                 HomePages.TYPE_WORK,
@@ -21,7 +22,7 @@ class HomePagesTest {
             pages.map { it.type },
         )
         assertTrue(pages.none { it.hidden })
-        assertEquals(1, HomePages.landingIndex(HomePages.visible(pages)))
+        assertEquals(2, HomePages.landingIndex(HomePages.visible(pages)))
     }
 
     @Test
@@ -67,7 +68,7 @@ class HomePagesTest {
         assertEquals(hiddenTail, HomePages.setHidden(hiddenTail, hiddenTail.first().id, true))
         assertEquals(hiddenTail, HomePages.delete(hiddenTail, hiddenTail.first().id))
         val withoutHidden = HomePages.delete(hiddenTail, hiddenTail[1].id)
-        assertEquals(3, withoutHidden.size)
+        assertEquals(4, withoutHidden.size)
         assertTrue(withoutHidden.none { it.id == hiddenTail[1].id })
     }
 
@@ -75,7 +76,7 @@ class HomePagesTest {
     fun createRenameMoveAndRepeatTypes() {
         val start = HomePages.defaults()
         val created = HomePages.create(start, "apps", "  Vacío  ", "page-apps")
-        assertEquals(5, created.size)
+        assertEquals(6, created.size)
         assertEquals(HomePages.TYPE_APPS, created.last().type)
         assertEquals("Vacío", created.last().label)
         assertEquals(start, HomePages.create(start, "NOPE", "X", "n"))
@@ -93,14 +94,32 @@ class HomePagesTest {
         assertEquals(created, HomePages.rename(created, "missing", "Hola"))
 
         val moved = HomePages.move(start, "page-work", -1)
-        assertEquals(HomePages.TYPE_WORK, moved[2].type)
-        assertEquals(HomePages.TYPE_DIET, moved[3].type)
+        assertEquals(HomePages.TYPE_WORK, moved[3].type)
+        assertEquals(HomePages.TYPE_DIET, moved[4].type)
         assertEquals(start, HomePages.move(start, "page-clock", -1))
         assertEquals(start, HomePages.move(start, "missing", 1))
 
         val secondClock = HomePages.create(start, HomePages.TYPE_CLOCK, "", "page-clock-2")
         assertEquals(2, secondClock.count { it.type == HomePages.TYPE_CLOCK })
-        assertEquals(1, HomePages.landingIndex(HomePages.visible(secondClock)))
+        assertEquals(2, HomePages.landingIndex(HomePages.visible(secondClock)))
+    }
+
+    @Test
+    fun legacyDefaultGainsAgendaAndACustomLayoutDoesNot() {
+        val legacy = listOf(
+            HomePageSpec(id = "page-clock", type = HomePages.TYPE_CLOCK),
+            HomePageSpec(id = "page-personal", type = HomePages.TYPE_PERSONAL),
+            HomePageSpec(id = "page-diet", type = HomePages.TYPE_DIET),
+            HomePageSpec(id = "page-work", type = HomePages.TYPE_WORK),
+        )
+        val upgraded = HomePages.resolve(legacy)
+        assertEquals(HomePages.defaults().map { it.type }, upgraded.map { it.type })
+        assertEquals("page-agenda", upgraded[1].id)
+
+        val renamed = legacy.map { if (it.id == "page-work") it.copy(label = "Oficina") else it }
+        assertEquals(legacy.map { it.id }, HomePages.resolve(renamed).map { it.id })
+        val reordered = listOf(legacy[1], legacy[0], legacy[2], legacy[3])
+        assertFalse(HomePages.resolve(reordered).any { it.type == HomePages.TYPE_AGENDA })
     }
 
     @Test
@@ -114,6 +133,7 @@ class HomePagesTest {
         assertEquals(
             listOf(
                 HomePages.TYPE_CLOCK,
+                HomePages.TYPE_AGENDA,
                 HomePages.TYPE_PERSONAL,
                 HomePages.TYPE_DIET,
                 HomePages.TYPE_WORK,
