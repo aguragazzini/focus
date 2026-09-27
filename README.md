@@ -3,7 +3,7 @@
 HOME launcher de lista blanca para Android. Kotlin + Jetpack Compose. Sin backend, sin Accessibility.
 
 Package: `com.foco.launcher`  
-Versión: `0.9.1` (versionCode 16)
+Versión: `0.9.2` (versionCode 17)
 
 Solo ves las apps que elegís. El resto no aparece.
 

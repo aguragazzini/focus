@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -630,11 +631,14 @@ private fun AddAppsScreen(
             )
         },
         bottomBar = {
+            // Scaffold pins this slot to the physical bottom and does not inset it.
+            // The nav padding is part of the measured bar, so the list stops above it.
             FocoPrimaryButton(
                 onClick = onConfirmAdd,
                 enabled = state.pendingAdd.isNotEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .padding(16.dp),
             ) {
                 Text(stringResource(R.string.add_done))
