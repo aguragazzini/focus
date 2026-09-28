@@ -68,6 +68,15 @@ class PrefsStore(context: Context) {
         update { it.copy(phonePaused = paused) }
     }
 
+    suspend fun setSilence(notificationsPaused: Boolean, phonePaused: Boolean) {
+        update {
+            it.copy(
+                notificationsPaused = notificationsPaused,
+                phonePaused = phonePaused,
+            )
+        }
+    }
+
     suspend fun setPackagePaused(packageName: String, paused: Boolean) {
         if (packageName.isBlank()) return
         update { prefs ->

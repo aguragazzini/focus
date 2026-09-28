@@ -156,6 +156,7 @@ class LauncherActivity : ComponentActivity() {
                     onMoveBlock = vm::moveHomeBlock,
                     onUpdateBlock = vm::updateHomeBlock,
                     onPhonePaused = vm::setPhonePaused,
+                    onSilence = vm::setSilence,
                     onPackagePaused = vm::setPackagePaused,
                 )
                     val pendingPin = pinAction

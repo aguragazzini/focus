@@ -66,6 +66,9 @@ import com.foco.launcher.core.FocoPrimaryButton
 import com.foco.launcher.core.FocoSpace
 import com.foco.launcher.core.FocoTextButton
 import com.foco.launcher.core.LaunchpadRules
+import com.foco.launcher.core.SilenceControl
+import com.foco.launcher.notification.Silence
+import com.foco.launcher.notification.SilenceLevel
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.security.PinSettingsRow
 import com.foco.launcher.work.WorkCatalogRules
@@ -99,6 +102,7 @@ fun SettingsHost(
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
+    onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
@@ -119,6 +123,7 @@ fun SettingsHost(
             onWorkPaused = onWorkPaused,
             onNotificationsPaused = onNotificationsPaused,
             onPhonePaused = onPhonePaused,
+            onSilence = onSilence,
             onNamesOnly = onNamesOnly,
             onEditHome = onEditHome,
             onRequestCalendar = onRequestCalendar,
@@ -182,6 +187,7 @@ private fun SettingsMain(
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
+    onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
@@ -261,31 +267,44 @@ private fun SettingsMain(
                 }
                 HorizontalDivider()
                 Column(modifier = Modifier.padding(top = 8.dp)) {
+                    val silence = Silence.level(state.notificationsPaused, state.phonePaused)
                     Text(
-                        text = stringResource(R.string.settings_avisos_block),
+                        text = stringResource(R.string.silencio_title),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground,
                         modifier = Modifier.padding(horizontal = 20.dp),
                     )
                     Text(
                         text = stringResource(
-                            if (state.notificationsPaused) R.string.nls_pause_status else R.string.nls_list_status,
+                            when (silence) {
+                                SilenceLevel.TODO -> R.string.silencio_todo_on
+                                SilenceLevel.AVISOS -> R.string.nls_paused_chip
+                                SilenceLevel.OFF -> R.string.nls_list_status
+                            },
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = FocoPaperDim,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.nls_pause),
-                        subtitle = stringResource(R.string.nls_pause_sub),
-                        checked = state.notificationsPaused,
-                        onCheckedChange = onNotificationsPaused,
+                    SilenceControl(
+                        notificationsPaused = state.notificationsPaused,
+                        phonePaused = state.phonePaused,
+                        onChange = onSilence,
+                        avisosIdle = stringResource(R.string.nls_pause),
+                        showTitle = false,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.phone_pause),
-                        subtitle = stringResource(R.string.phone_pause_sub),
-                        checked = state.phonePaused,
-                        onCheckedChange = onPhonePaused,
+                    Text(
+                        text = stringResource(
+                            when (silence) {
+                                SilenceLevel.TODO -> R.string.phone_pause_sub
+                                SilenceLevel.AVISOS -> R.string.nls_pause_sub
+                                SilenceLevel.OFF -> R.string.silencio_sub
+                            },
+                        ),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = FocoPaperDim,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
                 }
                 SettingsRow(

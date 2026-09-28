@@ -265,6 +265,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun setSilence(level: com.foco.launcher.notification.SilenceLevel) {
+        viewModelScope.launch {
+            app.prefsStore.setSilence(
+                notificationsPaused = com.foco.launcher.notification.Silence.notificationsPaused(level),
+                phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
+            )
+        }
+    }
+
     fun setPackagePaused(packageName: String, paused: Boolean) {
         viewModelScope.launch {
             app.prefsStore.setPackagePaused(packageName, paused)

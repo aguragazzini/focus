@@ -76,6 +76,7 @@ class SettingsActivity : ComponentActivity() {
                     onWorkPaused = vm::setWorkSectionPaused,
                     onNotificationsPaused = vm::setNotificationsPaused,
                     onPhonePaused = vm::setPhonePaused,
+                    onSilence = vm::setSilence,
                     onNamesOnly = vm::setNamesOnly,
                     onEditHome = {
                         startActivity(LauncherActivity.editIntent(this))

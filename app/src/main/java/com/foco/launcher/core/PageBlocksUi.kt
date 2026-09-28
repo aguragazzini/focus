@@ -53,6 +53,7 @@ fun PageBlockColumn(
     phonePaused: Boolean,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onLaunch: (String) -> Unit,
@@ -132,6 +133,7 @@ fun PageBlockColumn(
                     phonePaused = phonePaused,
                     onOpenClock = onOpenClock,
                     onOpenCalendar = onOpenCalendar,
+                    onSilence = onSilence,
                     onNotificationsPaused = onNotificationsPaused,
                     onPhonePaused = onPhonePaused,
                     onLaunch = onLaunch,
@@ -148,7 +150,11 @@ fun PageBlockColumn(
  */
 @Composable
 private fun frameLabel(type: String): String? {
-    if (type == PageBlocks.RELOJ || type == PageBlocks.VACIO) return null
+    if (type == PageBlocks.RELOJ || type == PageBlocks.VACIO ||
+        type == PageBlocks.SILENCIO || type == PageBlocks.PAUSAR
+    ) {
+        return null
+    }
     return blockLabel(type)
 }
 
@@ -168,6 +174,7 @@ private fun BlockFrame(label: String?, body: @Composable () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+            Spacer(Modifier.height(FocoSpace.hair))
         }
         body()
     }
@@ -192,6 +199,7 @@ private fun BlockBody(
     phonePaused: Boolean,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
+    onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onLaunch: (String) -> Unit,
@@ -253,16 +261,12 @@ private fun BlockBody(
         )
         PageBlocks.SEMANA -> BodyText("${PageBlockLogic.weekNumber(day)} · ${PageBlockLogic.weekdayShort(day)}")
         PageBlocks.LUNA -> BodyText(PageBlockLogic.moonLabel(PageBlockLogic.moonPhase(now)))
-        PageBlocks.SILENCIO -> FocoTextButton(onClick = { onNotificationsPaused(!notificationsPaused) }) {
-            Text(
-                stringResource(
-                    if (notificationsPaused) R.string.nls_paused_chip else R.string.nls_pause,
-                ),
-            )
-        }
-        PageBlocks.PAUSAR -> FocoTextButton(onClick = { onPhonePaused(!phonePaused) }) {
-            Text(stringResource(if (phonePaused) R.string.phone_paused_chip else R.string.phone_pause))
-        }
+        PageBlocks.SILENCIO, PageBlocks.PAUSAR -> SilenceControl(
+            notificationsPaused = notificationsPaused,
+            phonePaused = phonePaused,
+            onChange = onSilence,
+            avisosIdle = stringResource(R.string.nls_pause),
+        )
         PageBlocks.ATAJOS -> AppNames(apps.take(4), onLaunch)
         PageBlocks.TRABAJO -> {
             if (!hasWorkProfile) {

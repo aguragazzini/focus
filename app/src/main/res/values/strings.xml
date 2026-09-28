@@ -105,7 +105,12 @@
     <string name="settings_version">Versión</string>
     <string name="settings_about_body">Foco puede ocultar Trabajo y silenciar avisos. No cambia el perfil del sistema.</string>
     <string name="settings_about_calendar">El reloj muestra el Vetus y el Novus.</string>
-    <string name="settings_pause_note">Pausar Trabajo no es la pausa del perfil de trabajo de Android. Pausar avisos y Pausar teléfono no son el No molestar del teléfono.</string>
+    <string name="settings_pause_note">Pausar Trabajo oculta las apps de Trabajo. No es la pausa del perfil de trabajo de Android. Silencio no es el No molestar del teléfono.</string>
+    <string name="silencio_title">Silencio</string>
+    <string name="silencio_avisos">Avisos</string>
+    <string name="silencio_todo">Todo</string>
+    <string name="silencio_todo_on">Todo · En pausa</string>
+    <string name="silencio_sub">Avisos pausa lo que Foco controla. Todo cancela lo que Foco puede ver. No es el No molestar del teléfono.</string>
     <string name="phone_pause">Pausar teléfono</string>
     <string name="phone_resume">Reanudar teléfono</string>
     <string name="phone_pause_sub">Cancela los avisos que Foco puede ver. No es el No molestar del teléfono.</string>

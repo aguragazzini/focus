@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.foco.launcher.R
 import com.foco.launcher.notification.NlsRecovery
+import com.foco.launcher.notification.SilenceLevel
 import com.foco.launcher.registry.AppGroup
 import com.foco.launcher.registry.AppOrder
 import com.foco.launcher.registry.HomePageSpec
@@ -171,6 +172,7 @@ fun HomeScreen(
     onHidePage: (String, Boolean) -> Unit = { _, _ -> },
     onDeletePage: (String) -> Unit = {},
     onPhonePaused: (Boolean) -> Unit = {},
+    onSilence: (SilenceLevel) -> Unit = {},
     onPackagePaused: (String, Boolean) -> Unit = { _, _ -> },
     onAddBlock: (String, String) -> Unit = { _, _ -> },
     onRemoveBlock: (String, String) -> Unit = { _, _ -> },
@@ -402,6 +404,7 @@ fun HomeScreen(
                         onOpenSystemSettings = onOpenSystemSettings,
                         onNotificationsPaused = onNotificationsPaused,
                         onPhonePaused = onPhonePaused,
+                        onSilence = onSilence,
                         onLaunch = onLaunch,
                         onUpdateBlock = { onUpdateBlock(spec.id, it) },
                     )
@@ -426,6 +429,7 @@ fun HomeScreen(
                                 onOpenSystemSettings = onOpenSystemSettings,
                                 onNotificationsPaused = onNotificationsPaused,
                                 onPhonePaused = onPhonePaused,
+                                onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                             )
@@ -445,6 +449,7 @@ fun HomeScreen(
                         onOpenAvisos = onOpenAvisos,
                         onNotificationsPaused = onNotificationsPaused,
                         onPhonePaused = onPhonePaused,
+                        onSilence = onSilence,
                         onPackagePaused = onPackagePaused,
                         onLaunch = onLaunch,
                         onOpenGroup = { openedGroupId = it },
@@ -467,6 +472,7 @@ fun HomeScreen(
                                 onOpenSystemSettings = onOpenSystemSettings,
                                 onNotificationsPaused = onNotificationsPaused,
                                 onPhonePaused = onPhonePaused,
+                                onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
@@ -488,6 +494,7 @@ fun HomeScreen(
                         onOpenAvisos = onOpenAvisos,
                         onNotificationsPaused = onNotificationsPaused,
                         onPhonePaused = onPhonePaused,
+                        onSilence = onSilence,
                         onPackagePaused = onPackagePaused,
                         onLaunch = onLaunch,
                         onOpenGroup = { openedGroupId = it },
@@ -510,6 +517,7 @@ fun HomeScreen(
                                 onOpenSystemSettings = onOpenSystemSettings,
                                 onNotificationsPaused = onNotificationsPaused,
                                 onPhonePaused = onPhonePaused,
+                                onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
@@ -539,6 +547,7 @@ fun HomeScreen(
                                 onOpenSystemSettings = onOpenSystemSettings,
                                 onNotificationsPaused = onNotificationsPaused,
                                 onPhonePaused = onPhonePaused,
+                                onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                             )
@@ -581,6 +590,7 @@ fun HomeScreen(
                                 onOpenSystemSettings = onOpenSystemSettings,
                                 onNotificationsPaused = onNotificationsPaused,
                                 onPhonePaused = onPhonePaused,
+                                onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
@@ -1124,6 +1134,7 @@ private fun ClockHomePage(
     onOpenSystemSettings: () -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
+    onSilence: (SilenceLevel) -> Unit,
     onLaunch: (String) -> Unit,
     onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
 ) {
@@ -1135,6 +1146,7 @@ private fun ClockHomePage(
         onOpenSystemSettings = onOpenSystemSettings,
         onNotificationsPaused = onNotificationsPaused,
         onPhonePaused = onPhonePaused,
+        onSilence = onSilence,
         onLaunch = onLaunch,
         onUpdateBlock = onUpdateBlock,
     )
@@ -1149,6 +1161,7 @@ private fun BlockPage(
     onOpenSystemSettings: () -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
+    onSilence: (SilenceLevel) -> Unit,
     onLaunch: (String) -> Unit,
     onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
     scroll: Boolean = true,
@@ -1164,6 +1177,7 @@ private fun BlockPage(
             phonePaused = state.phonePaused,
             onOpenClock = onOpenClock,
             onOpenCalendar = onOpenCalendar,
+            onSilence = onSilence,
             onNotificationsPaused = onNotificationsPaused,
             onPhonePaused = onPhonePaused,
             onLaunch = onLaunch,
@@ -1204,6 +1218,7 @@ private fun PersonalHomePage(
     onOpenAvisos: () -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
+    onSilence: (SilenceLevel) -> Unit,
     onPackagePaused: (String, Boolean) -> Unit,
     onLaunch: (String) -> Unit,
     onOpenGroup: (String) -> Unit,
@@ -1239,18 +1254,12 @@ private fun PersonalHomePage(
             )
             if (showPause) {
                 Spacer(Modifier.height(FocoSpace.gap))
-                PagePause(
-                    paused = state.notificationsPaused,
-                    idle = stringResource(R.string.nls_pause),
-                    active = stringResource(R.string.nls_paused_chip),
-                    onClick = { onNotificationsPaused(!state.notificationsPaused) },
-                )
-                Spacer(Modifier.height(FocoSpace.gap))
-                PagePause(
-                    paused = state.phonePaused,
-                    idle = stringResource(R.string.phone_pause),
-                    active = stringResource(R.string.phone_paused_chip),
-                    onClick = { onPhonePaused(!state.phonePaused) },
+                SilenceControl(
+                    notificationsPaused = state.notificationsPaused,
+                    phonePaused = state.phonePaused,
+                    onChange = onSilence,
+                    avisosIdle = stringResource(R.string.nls_pause),
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
                 )
             }
             Spacer(Modifier.height(FocoSpace.section))
@@ -1373,7 +1382,10 @@ private fun WorkHomePage(
                     text = stringResource(R.string.work_pause_status),
                     style = MaterialTheme.typography.bodyLarge,
                     color = FocoPaperDim,
-                    modifier = Modifier.padding(horizontal = FocoSpace.page),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = FocoSpace.page),
                 )
             }
         } else if (state.workKind == WorkSectionKind.Hidden) {
@@ -1597,18 +1609,30 @@ private fun PagePause(
     onClick: () -> Unit,
 ) {
     val label = if (paused) active else idle
-    Text(
-        text = label,
+    Box(
         modifier = Modifier
-            .padding(horizontal = FocoSpace.page)
-            .clip(RoundedCornerShape(50))
-            .background(if (paused) FocoInkElevated else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.gap)
-            .semantics { contentDescription = label },
-        style = MaterialTheme.typography.bodyMedium,
-        color = FocoPaperDim,
-    )
+            .fillMaxWidth()
+            .padding(horizontal = FocoSpace.page),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier = Modifier
+                .height(FocoSpace.touch)
+                .clip(RoundedCornerShape(50))
+                .background(if (paused) FocoInkElevated else Color.Transparent)
+                .clickable(onClick = onClick)
+                .padding(horizontal = FocoSpace.gapLg),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (paused) FocoPaper else FocoPaperDim,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.semantics { contentDescription = label },
+            )
+        }
+    }
 }
 
 @Composable
