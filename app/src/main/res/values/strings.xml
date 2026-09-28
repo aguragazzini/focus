@@ -156,9 +156,10 @@
     <string name="uso_chip_week">7 días</string>
     <string name="uso_week_label">Últimos 7 días</string>
     <string name="uso_more">Más usadas</string>
-    <string name="uso_screen">Pantalla %1$s</string>
-    <string name="uso_leak">%1$d fuera de Personal · %2$s</string>
-    <string name="uso_fuera">fuera</string>
+    <string name="uso_screen">Pantalla encendida</string>
+    <string name="uso_leak">Fuera de Foco · %1$s</string>
+    <string name="uso_in_foco">En Foco</string>
+    <string name="uso_last">Última vez · %1$s</string>
     <string name="uso_read_fail">No se pudo leer el uso</string>
     <string name="uso_restricted">Si al volver el acceso sigue sin concederse, en algunos teléfonos: Apps → Foco → ⋮ → Permitir ajustes restringidos.</string>
     <string name="uso_open_fail">No se abrió el acceso de uso.</string>

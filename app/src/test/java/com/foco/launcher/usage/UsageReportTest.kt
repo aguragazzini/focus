@@ -129,20 +129,27 @@ class UsageReportTest {
     }
 
     @Test
-    fun leakCountsTimeOutsidePersonalAndSkipsTheWhitelist() {
+    fun focoLineOmitsAnEmptyWhitelistAndNamesTimeOutsideIt() {
         val apps = listOf(
             UsageApp("com.chrome", "Chrome", todayMs = 3_600_000L, weekMs = 3_600_000L, launchable = true),
             UsageApp("com.maps", "Maps", todayMs = 0L, weekMs = 120_000L, launchable = true),
             UsageApp("com.foco", "Foco", todayMs = 60_000L, weekMs = 60_000L, launchable = true),
         )
-        val personal = setOf("com.foco")
-        val today = UsageReport.leak(apps, byToday = true, personal = personal)
-        assertEquals(1, today?.count)
-        assertEquals(3_600_000L, today?.ms)
-        val week = UsageReport.leak(apps, byToday = false, personal = personal)
-        assertEquals(2, week?.count)
-        assertEquals(3_720_000L, week?.ms)
-        assertEquals(null, UsageReport.leak(apps, byToday = true, personal = setOf("com.chrome", "com.foco")))
+        assertEquals(FocoPlace.HIDDEN, UsageReport.focoLine(apps, byToday = true, personal = emptySet()).place)
+        val today = UsageReport.focoLine(apps, byToday = true, personal = setOf("com.foco"))
+        assertEquals(FocoPlace.OUTSIDE, today.place)
+        assertEquals(3_600_000L, today.outsideMs)
+        val inside = UsageReport.focoLine(apps, byToday = true, personal = setOf("com.chrome", "com.foco"))
+        assertEquals(FocoPlace.INSIDE, inside.place)
+        val week = UsageReport.focoLine(apps, byToday = false, personal = setOf("com.foco"))
+        assertEquals(FocoPlace.OUTSIDE, week.place)
+        assertEquals(3_720_000L, week.outsideMs)
+        val xml = File("src/main/res/values/strings.xml").readText()
+        assertTrue(xml.contains(">Pantalla encendida<"))
+        assertTrue(xml.contains(">Fuera de Foco · %1\$s<"))
+        assertTrue(xml.contains(">En Foco<"))
+        assertTrue(xml.contains(">Última vez · %1\$s<"))
+        assertFalse(xml.contains("fuera de Personal"))
     }
 
     @Test
@@ -166,8 +173,10 @@ class UsageReportTest {
         assertEquals(null, UsageFormat.lastUsed(0L, now, zone))
         assertEquals(null, UsageFormat.lastUsed(now + 5_000L, now, zone))
         assertEquals("hace 12 min", UsageFormat.lastUsed(now - 12 * 60_000L, now, zone))
+        val earlierToday = java.time.ZonedDateTime.of(2026, 9, 28, 14, 32, 0, 0, zone).toInstant().toEpochMilli()
+        assertEquals("hoy 14:32", UsageFormat.lastUsed(earlierToday, now, zone))
         val yesterday = java.time.ZonedDateTime.of(2026, 9, 27, 18, 40, 0, 0, zone).toInstant().toEpochMilli()
-        assertEquals("ayer 18:40", UsageFormat.lastUsed(yesterday, now, zone))
+        assertEquals("ayer", UsageFormat.lastUsed(yesterday, now, zone))
     }
 
     @Test

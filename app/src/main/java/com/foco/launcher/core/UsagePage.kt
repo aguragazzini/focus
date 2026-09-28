@@ -155,7 +155,7 @@ fun UsageHomePage(
             val total = UsageReport.totalMs(loaded.apps, byToday)
             val weekTotal = UsageReport.totalMs(loaded.apps, byToday = false)
             val peak = rows.maxOfOrNull { if (byToday) it.todayMs else it.weekMs } ?: 0L
-            val leak = UsageReport.leak(loaded.apps, byToday, personal)
+            val foco = UsageReport.focoLine(loaded.apps, byToday, personal)
             val screenMs = loaded.screenOnTodayMs
             item(key = "uso-total") {
                 UsageTotal(
@@ -163,8 +163,8 @@ fun UsageHomePage(
                     subtitle = stringResource(
                         if (byToday) R.string.uso_chip_today else R.string.uso_week_label,
                     ),
-                    screenLine = if (byToday && screenMs != null) {
-                        stringResource(R.string.uso_screen, UsageFormat.duration(screenMs))
+                    screenValue = if (byToday && screenMs != null) {
+                        UsageFormat.duration(screenMs)
                     } else {
                         null
                     },
@@ -173,10 +173,13 @@ fun UsageHomePage(
                     } else {
                         null
                     },
-                    leakLine = if (leak == null) {
-                        null
-                    } else {
-                        stringResource(R.string.uso_leak, leak.count, UsageFormat.duration(leak.ms))
+                    leakLine = when (foco.place) {
+                        com.foco.launcher.usage.FocoPlace.HIDDEN -> null
+                        com.foco.launcher.usage.FocoPlace.INSIDE -> stringResource(R.string.uso_in_foco)
+                        com.foco.launcher.usage.FocoPlace.OUTSIDE -> stringResource(
+                            R.string.uso_leak,
+                            UsageFormat.duration(foco.outsideMs),
+                        )
                     },
                     days = loaded.days,
                     zone = zone,
@@ -207,7 +210,6 @@ fun UsageHomePage(
                         ms = if (byToday) app.todayMs else app.weekMs,
                         peak = peak,
                         namesOnly = namesOnly,
-                        outside = app.packageName !in personal,
                         readAtMillis = loaded.readAtMillis,
                         zone = zone,
                         onLaunch = onLaunch,
@@ -292,7 +294,7 @@ private fun UsagePermission(
 private fun UsageTotal(
     totalLabel: String,
     subtitle: String,
-    screenLine: String?,
+    screenValue: String?,
     weekLine: String?,
     leakLine: String?,
     days: List<UsageDay>,
@@ -321,16 +323,21 @@ private fun UsageTotal(
             color = FocoPaperDim,
             textAlign = TextAlign.Center,
         )
-        if (screenLine != null) {
-            Spacer(Modifier.height(FocoSpace.hair))
+        if (screenValue != null) {
+            Spacer(Modifier.height(FocoSpace.gap))
             Text(
-                text = screenLine,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = FocoSpace.page),
-                style = MaterialTheme.typography.bodyLarge,
+                text = stringResource(R.string.uso_screen),
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = FocoPaperDim,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = screenValue,
+                modifier = Modifier.fillMaxWidth(),
                 color = FocoPaper,
                 textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 24.sp),
             )
         }
         if (weekLine != null) {
@@ -449,7 +456,6 @@ private fun UsageRow(
     ms: Long,
     peak: Long,
     namesOnly: Boolean,
-    outside: Boolean,
     readAtMillis: Long,
     zone: ZoneId,
     onLaunch: (String) -> Unit,
@@ -463,11 +469,6 @@ private fun UsageRow(
     }
     val fraction = if (peak > 0L) (ms.toFloat() / peak.toFloat()).coerceIn(0f, 1f) else 0f
     val used = UsageFormat.lastUsed(app.lastUsedMillis, readAtMillis, zone)
-    val fuera = stringResource(R.string.uso_fuera)
-    val note = buildList {
-        if (outside) add(fuera)
-        if (used != null) add(used)
-    }.joinToString(" · ")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -494,13 +495,13 @@ private fun UsageRow(
                     maxLines = 1,
                 )
             }
-            if (note.isNotEmpty()) {
+            if (used != null) {
                 Text(
-                    text = note,
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = stringResource(R.string.uso_last, used),
                     color = FocoPaperDim,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp, lineHeight = 16.sp),
                 )
             }
             Box(

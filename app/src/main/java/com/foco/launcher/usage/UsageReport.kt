@@ -27,10 +27,12 @@ data class UsageDay(
     val foregroundMs: Long,
 )
 
-/** Foreground time on apps that are not in the Personal whitelist. */
-data class UsageLeak(
-    val count: Int,
-    val ms: Long,
+enum class FocoPlace { HIDDEN, INSIDE, OUTSIDE }
+
+/** Whitelist comparison for the active span. [outsideMs] is set only for [FocoPlace.OUTSIDE]. */
+data class FocoLine(
+    val place: FocoPlace,
+    val outsideMs: Long = 0L,
 )
 
 /** One daily bucket. [beginMillis] is the bucket start, not a guessed session. */
@@ -85,16 +87,21 @@ object UsageReport {
     }
 
     /**
-     * Apps with time in the selected span that are absent from [personal].
-     * An empty whitelist still counts: those apps are outside Personal.
+     * Time in the selected span that is not on the Personal whitelist.
+     * An empty whitelist hides the line. No outside time is "En Foco".
      */
-    fun leak(apps: List<UsageApp>, byToday: Boolean, personal: Set<String>): UsageLeak? {
-        val outside = apps.filter { ms(it, byToday) > 0L && it.packageName !in personal }
-        if (outside.isEmpty()) return null
-        return UsageLeak(
-            count = outside.size,
-            ms = outside.sumOf { ms(it, byToday) },
-        )
+    fun focoLine(apps: List<UsageApp>, byToday: Boolean, personal: Set<String>): FocoLine {
+        if (personal.isEmpty()) return FocoLine(FocoPlace.HIDDEN)
+        val inPeriod = apps.filter { ms(it, byToday) > 0L }
+        if (inPeriod.isEmpty()) return FocoLine(FocoPlace.HIDDEN)
+        val outsideMs = inPeriod
+            .filter { it.packageName !in personal }
+            .sumOf { ms(it, byToday) }
+        return if (outsideMs <= 0L) {
+            FocoLine(FocoPlace.INSIDE)
+        } else {
+            FocoLine(FocoPlace.OUTSIDE, outsideMs)
+        }
     }
 
     /** Sum of SCREEN_INTERACTIVE totals. No matching time means there is nothing to show. */
@@ -195,13 +202,10 @@ object UsageFormat {
             if (delta < 60_000L) return "hace < 1 min"
             val minutes = delta / 60_000L
             if (minutes < 60L) return "hace $minutes min"
-            val hours = minutes / 60L
-            val rest = minutes % 60L
-            return if (rest == 0L) "hace $hours h" else "hace $hours h $rest min"
+            return "hoy ${clock(lastMillis, zone)}"
         }
-        val clock = clock(lastMillis, zone)
-        if (lastDate == today.minusDays(1)) return "ayer $clock"
-        return "${weekday(lastMillis, zone)} $clock"
+        if (lastDate == today.minusDays(1)) return "ayer"
+        return "${weekday(lastMillis, zone)} ${clock(lastMillis, zone)}"
     }
 
     fun weekday(startMillis: Long, zone: ZoneId): String {
