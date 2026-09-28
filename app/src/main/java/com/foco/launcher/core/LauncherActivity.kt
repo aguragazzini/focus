@@ -30,6 +30,7 @@ class LauncherActivity : ComponentActivity() {
     private lateinit var vm: HomeViewModel
     private var requestEdit by mutableStateOf(false)
     private var homeToken by mutableIntStateOf(0)
+    private var openPage by mutableStateOf<String?>(null)
     private var pinAction by mutableStateOf<(() -> Unit)?>(null)
     private var pinWrong by mutableStateOf(false)
     private val calendarPermission = registerForActivityResult(
@@ -38,6 +39,7 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         requestEdit = intent.getBooleanExtra(EXTRA_EDIT_HOME, false)
+        openPage = readOpenPage(intent)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val app = application as FocoApp
@@ -163,6 +165,11 @@ class LauncherActivity : ComponentActivity() {
                     onArmSilence = vm::armSilenceOnConnect,
                     onPackagePaused = vm::setPackagePaused,
                     homeToken = homeToken,
+                    openPage = openPage,
+                    onOpenPageConsumed = {
+                        openPage = null
+                        intent.removeExtra(EXTRA_OPEN_PAGE)
+                    },
                 )
                     val pendingPin = pinAction
                     if (pendingPin != null) {
@@ -192,8 +199,11 @@ class LauncherActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        val page = readOpenPage(intent)
         if (intent.getBooleanExtra(EXTRA_EDIT_HOME, false)) {
             requestEdit = true
+        } else if (page != null) {
+            openPage = page
         } else {
             homeToken++
         }
@@ -201,9 +211,9 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onRestart() {
         super.onRestart()
-        if (!intent.getBooleanExtra(EXTRA_EDIT_HOME, false)) {
-            homeToken++
-        }
+        if (intent.getBooleanExtra(EXTRA_EDIT_HOME, false)) return
+        if (readOpenPage(intent) != null || openPage != null) return
+        homeToken++
     }
 
     override fun onResume() {
@@ -213,6 +223,21 @@ class LauncherActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_EDIT_HOME = "edit_home"
+        const val EXTRA_OPEN_PAGE = "open_page"
+
+        fun readOpenPage(intent: Intent): String? {
+            return intent.getStringExtra(EXTRA_OPEN_PAGE)?.trim()?.uppercase()?.takeIf { it.isNotEmpty() }
+        }
+
+        fun pageIntent(context: android.content.Context, type: String): Intent {
+            return Intent(context, LauncherActivity::class.java)
+                .putExtra(EXTRA_OPEN_PAGE, type)
+                .addFlags(
+                    Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                )
+        }
 
         fun editIntent(context: android.content.Context): Intent {
             return Intent(context, LauncherActivity::class.java)

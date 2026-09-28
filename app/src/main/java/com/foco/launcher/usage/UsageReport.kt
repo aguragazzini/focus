@@ -18,6 +18,12 @@ data class UsageApp(
     val launchable: Boolean,
 )
 
+/** One daily bucket. [beginMillis] is the bucket start, not a guessed session. */
+data class UsageSpan(
+    val beginMillis: Long,
+    val foregroundMs: Long,
+)
+
 /**
  * Today plus the six previous local midnights. Week totals include today.
  * Packages without a real label are dropped. Numbers are never invented.
@@ -75,6 +81,23 @@ object UsageReport {
 
     private fun ms(app: UsageApp, byToday: Boolean): Long {
         return if (byToday) app.todayMs else app.weekMs
+    }
+
+    /**
+     * Seven local days, oldest first, ending today. A day with no bucket is 0.
+     * Days outside that window are dropped, not moved.
+     */
+    fun dayTotals(spans: List<UsageSpan>, nowMillis: Long, zone: ZoneId): List<Long> {
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val days = (6 downTo 0).map { today.minusDays(it.toLong()) }
+        val sums = HashMap<LocalDate, Long>()
+        for (span in spans) {
+            if (span.foregroundMs <= 0L || span.beginMillis <= 0L) continue
+            val day = Instant.ofEpochMilli(span.beginMillis).atZone(zone).toLocalDate()
+            if (day !in days) continue
+            sums[day] = (sums[day] ?: 0L) + span.foregroundMs
+        }
+        return days.map { sums[it] ?: 0L }
     }
 
     private fun sum(samples: List<UsageSample>): Map<String, Long> {

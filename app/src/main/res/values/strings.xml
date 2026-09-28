@@ -150,9 +150,13 @@
     <string name="uso_permission_title">Ver tu uso</string>
     <string name="uso_permission">Foco necesita permiso de uso de apps. Se abre en Ajustes del sistema.</string>
     <string name="uso_permission_cta">Activar uso</string>
-    <string name="uso_empty">No hay uso registrado en estos días.</string>
+    <string name="uso_empty_today">Todavía no hay datos de hoy</string>
+    <string name="uso_empty_week">Sin uso en estos 7 días</string>
     <string name="uso_chip_today">Hoy</string>
     <string name="uso_chip_week">7 días</string>
+    <string name="uso_week_label">Últimos 7 días</string>
+    <string name="uso_more">Más usadas</string>
+    <string name="uso_read_fail">No se pudo leer el uso</string>
     <string name="uso_restricted">Si al volver el acceso sigue sin concederse, en algunos teléfonos: Apps → Foco → ⋮ → Permitir ajustes restringidos.</string>
     <string name="uso_open_fail">No se abrió el acceso de uso.</string>
     <string name="uso_refresh">Actualizar</string>

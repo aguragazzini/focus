@@ -1,5 +1,6 @@
 package com.foco.launcher.core
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,9 +22,14 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,6 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -40,6 +50,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -51,6 +63,8 @@ import com.foco.launcher.usage.UsageReader
 import com.foco.launcher.usage.UsageReport
 import com.foco.launcher.usage.UsageSnapshot
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
 
@@ -62,6 +76,7 @@ fun UsageHomePage(
     modifier: Modifier = Modifier,
     zone: ZoneId = HomeClockFormat.CIVIL_ZONE,
     active: Boolean = true,
+    namesOnly: Boolean = false,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -80,7 +95,19 @@ fun UsageHomePage(
         }
     }
     val loaded = snapshot
-    LazyColumn(modifier = modifier.fillMaxSize()) {
+    val failText = stringResource(R.string.uso_read_fail)
+    val snackbar = remember { SnackbarHostState() }
+    LaunchedEffect(loaded?.failed, loaded) {
+        if (loaded?.failed != true) return@LaunchedEffect
+        val shown = launch {
+            snackbar.showSnackbar(failText, duration = SnackbarDuration.Indefinite)
+        }
+        delay(2_000)
+        snackbar.currentSnackbarData?.dismiss()
+        shown.join()
+    }
+    Box(modifier = modifier.fillMaxSize()) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
         item(key = "uso-head") {
             Spacer(Modifier.height(FocoSpace.gap))
             if (title.isNotBlank()) {
@@ -119,12 +146,25 @@ fun UsageHomePage(
                     },
                 )
             }
+        } else if (loaded.failed) {
+            item(key = "uso-failed") { Spacer(Modifier.height(FocoSpace.section)) }
         } else {
             val rows = UsageReport.rank(loaded.apps, byToday)
             val total = UsageReport.totalMs(loaded.apps, byToday)
+            val weekTotal = UsageReport.totalMs(loaded.apps, byToday = false)
+            val peak = rows.maxOfOrNull { if (byToday) it.todayMs else it.weekMs } ?: 0L
             item(key = "uso-total") {
                 UsageTotal(
                     totalLabel = UsageFormat.duration(total),
+                    subtitle = stringResource(
+                        if (byToday) R.string.uso_chip_today else R.string.uso_week_label,
+                    ),
+                    weekLine = if (byToday) {
+                        stringResource(R.string.uso_week_label) + " · " + UsageFormat.duration(weekTotal)
+                    } else {
+                        null
+                    },
+                    days = loaded.days,
                     byToday = byToday,
                     onToday = { byToday = true },
                     onWeek = { byToday = false },
@@ -134,7 +174,9 @@ fun UsageHomePage(
             if (rows.isEmpty()) {
                 item(key = "uso-empty") {
                     Text(
-                        text = stringResource(R.string.uso_empty),
+                        text = stringResource(
+                            if (byToday) R.string.uso_empty_today else R.string.uso_empty_week,
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = FocoSpace.page),
@@ -148,7 +190,8 @@ fun UsageHomePage(
                     UsageRow(
                         app = app,
                         ms = if (byToday) app.todayMs else app.weekMs,
-                        total = total,
+                        peak = peak,
+                        namesOnly = namesOnly,
                         onLaunch = onLaunch,
                     )
                 }
@@ -159,6 +202,17 @@ fun UsageHomePage(
                 Modifier
                     .fillMaxWidth()
                     .height(120.dp),
+            )
+        }
+    }
+        SnackbarHost(
+            hostState = snackbar,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        ) { data ->
+            Snackbar(
+                snackbarData = data,
+                containerColor = FocoInkElevated,
+                contentColor = FocoPaperDim,
             )
         }
     }
@@ -219,6 +273,9 @@ private fun UsagePermission(
 @Composable
 private fun UsageTotal(
     totalLabel: String,
+    subtitle: String,
+    weekLine: String?,
+    days: List<Long>,
     byToday: Boolean,
     onToday: () -> Unit,
     onWeek: () -> Unit,
@@ -230,11 +287,36 @@ private fun UsageTotal(
     ) {
         Text(
             text = totalLabel,
-            style = MaterialTheme.typography.titleLarge,
+            modifier = Modifier.fillMaxWidth(),
             color = FocoPaper,
             textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.titleLarge.copy(fontSize = 36.sp, lineHeight = 42.sp),
         )
-        Spacer(Modifier.height(FocoSpace.gap))
+        Spacer(Modifier.height(FocoSpace.hair))
+        Text(
+            text = subtitle,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            textAlign = TextAlign.Center,
+        )
+        if (weekLine != null) {
+            Spacer(Modifier.height(FocoSpace.gapLg))
+            Text(
+                text = weekLine,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page),
+                style = MaterialTheme.typography.bodyLarge,
+                color = FocoPaper,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (days.any { it > 0L }) {
+            Spacer(Modifier.height(FocoSpace.gap))
+            DayBars(days)
+        }
+        Spacer(Modifier.height(FocoSpace.gapLg))
         Row(
             modifier = Modifier.selectableGroup(),
             horizontalArrangement = Arrangement.Center,
@@ -247,7 +329,45 @@ private fun UsageTotal(
         FocoTextButton(onClick = onRefresh) {
             Text(stringResource(R.string.uso_refresh))
         }
+        Text(
+            text = stringResource(R.string.uso_more),
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(FocoSpace.gap))
+    }
+}
+
+@Composable
+private fun DayBars(days: List<Long>) {
+    val max = days.maxOrNull()?.coerceAtLeast(1L) ?: return
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = FocoSpace.page)
+            .height(28.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        days.forEach { ms ->
+            val fraction = (ms.toFloat() / max.toFloat()).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .background(FocoLine),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .fillMaxHeight(fraction)
+                        .background(FocoPaper.copy(alpha = 0.20f)),
+                )
+            }
+        }
     }
 }
 
@@ -273,7 +393,8 @@ private fun UsageChip(label: String, selected: Boolean, onClick: () -> Unit) {
 private fun UsageRow(
     app: UsageApp,
     ms: Long,
-    total: Long,
+    peak: Long,
+    namesOnly: Boolean,
     onLaunch: (String) -> Unit,
 ) {
     val open = if (app.launchable) {
@@ -283,7 +404,7 @@ private fun UsageRow(
     } else {
         Modifier
     }
-    val fraction = if (total > 0L) (ms.toFloat() / total.toFloat()).coerceIn(0f, 1f) else 0f
+    val fraction = if (peak > 0L) (ms.toFloat() / peak.toFloat()).coerceIn(0f, 1f) else 0f
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -291,25 +412,13 @@ private fun UsageRow(
             .padding(horizontal = FocoSpace.page, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(FocoLine),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = tileInitial(app.label),
-                style = MaterialTheme.typography.labelLarge,
-                color = FocoPaperDim,
-            )
-        }
+        UsageGlyph(app = app, namesOnly = namesOnly)
         Column(modifier = Modifier.padding(start = FocoSpace.gap).weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = app.label,
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
                     color = FocoPaper,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -317,8 +426,8 @@ private fun UsageRow(
                 Text(
                     text = UsageFormat.duration(ms),
                     modifier = Modifier.padding(start = FocoSpace.gap),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = FocoPaper,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
+                    color = FocoPaperDim,
                     maxLines = 1,
                 )
             }
@@ -333,9 +442,52 @@ private fun UsageRow(
                     modifier = Modifier
                         .fillMaxWidth(fraction)
                         .height(2.dp)
-                        .background(FocoPaperDim),
+                        .background(FocoPaper.copy(alpha = 0.20f)),
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun UsageGlyph(app: UsageApp, namesOnly: Boolean) {
+    val context = LocalContext.current
+    val bitmap by produceState<ImageBitmap?>(null, app.packageName, namesOnly) {
+        if (namesOnly) {
+            value = null
+            return@produceState
+        }
+        value = withContext(Dispatchers.IO) {
+            runCatching {
+                context.packageManager.getApplicationIcon(app.packageName)
+                    .toBitmap(width = 96, height = 96)
+                    .asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    val image = bitmap
+    if (image != null) {
+        Image(
+            bitmap = image,
+            contentDescription = null,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop,
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(FocoInkElevated),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = tileInitial(app.label),
+                style = MaterialTheme.typography.labelLarge,
+                color = FocoPaperDim,
+            )
         }
     }
 }

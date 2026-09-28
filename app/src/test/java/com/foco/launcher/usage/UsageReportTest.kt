@@ -87,11 +87,40 @@ class UsageReportTest {
         assertFalse(reader.contains("queryEvents"))
         assertFalse(reader.contains("createContextAsUser"))
         val page = File("src/main/java/com/foco/launcher/core/UsagePage.kt").readText()
-        assertFalse(page.contains("delay("))
+        assertFalse(page.contains("while (true)"))
+        assertFalse(page.contains("delay(60_000"))
         assertTrue(page.contains("uso_refresh"))
+        assertTrue(page.contains("uso_empty_today"))
+        assertTrue(page.contains("uso_read_fail"))
+        assertTrue(page.contains("36.sp"))
+        assertTrue(page.contains("0.20f"))
         assertTrue(page.contains("if (!active) return@LaunchedEffect"))
         val home = File("src/main/java/com/foco/launcher/core/HomeScreen.kt").readText()
         assertTrue(home.contains("pagerState.settledPage == page"))
+    }
+
+    @Test
+    fun dayTotalsKeepSevenLocalDaysAndDropTheRest() {
+        val zone = ZoneId.of("America/Argentina/Cordoba")
+        val now = java.time.ZonedDateTime.of(2026, 9, 28, 15, 0, 0, 0, zone).toInstant().toEpochMilli()
+        val older = java.time.LocalDate.of(2026, 9, 21).atStartOfDay(zone).toInstant().toEpochMilli()
+        val first = java.time.LocalDate.of(2026, 9, 22).atStartOfDay(zone).toInstant().toEpochMilli()
+        val last = java.time.LocalDate.of(2026, 9, 28).atStartOfDay(zone).toInstant().toEpochMilli()
+        val days = UsageReport.dayTotals(
+            spans = listOf(
+                UsageSpan(older, 9_000L),
+                UsageSpan(first, 60_000L),
+                UsageSpan(first + 1_000L, 30_000L),
+                UsageSpan(last, 120_000L),
+                UsageSpan(0L, 50_000L),
+            ),
+            nowMillis = now,
+            zone = zone,
+        )
+        assertEquals(7, days.size)
+        assertEquals(90_000L, days.first())
+        assertEquals(0L, days[1])
+        assertEquals(120_000L, days.last())
     }
 
     @Test

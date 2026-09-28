@@ -109,6 +109,7 @@ fun SettingsHost(
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
     onOpenAllApps: () -> Unit,
+    onOpenUso: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -133,6 +134,7 @@ fun SettingsHost(
             onOpenAppInfo = onOpenAppInfo,
             onOpenNlsSettings = onOpenNlsSettings,
             onOpenAllApps = onOpenAllApps,
+            onOpenUso = onOpenUso,
         )
         SettingsDest.Edit -> EditAppsScreen(
             state = state,
@@ -198,6 +200,7 @@ private fun SettingsMain(
     onOpenAppInfo: () -> Unit,
     onOpenNlsSettings: () -> Unit,
     onOpenAllApps: () -> Unit,
+    onOpenUso: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -266,6 +269,11 @@ private fun SettingsMain(
                             if (calendarGranted) R.string.settings_agenda_on else R.string.settings_agenda_need,
                         ),
                         onClick = onRequestCalendar,
+                    )
+                    SettingsRow(
+                        title = stringResource(R.string.page_uso),
+                        subtitle = stringResource(R.string.uso_scope),
+                        onClick = onOpenUso,
                     )
                     PinSettingsRow()
                 }

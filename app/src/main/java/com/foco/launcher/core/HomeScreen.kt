@@ -186,6 +186,8 @@ fun HomeScreen(
     onMoveBlock: (String, String, Int) -> Unit = { _, _, _ -> },
     onUpdateBlock: (String, com.foco.launcher.registry.PageBlock) -> Unit = { _, _ -> },
     homeToken: Int = 0,
+    openPage: String? = null,
+    onOpenPageConsumed: () -> Unit = {},
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -390,10 +392,21 @@ fun HomeScreen(
             }
             LaunchedEffect(homeToken) {
                 if (homeToken > 0) editing = false
+                if (!openPage.isNullOrBlank()) return@LaunchedEffect
                 val pages = HomePages.visible(state.homePages)
                 val last = (pages.size - 1).coerceAtLeast(0)
                 val target = HomePages.landingIndex(pages).coerceIn(0, last)
                 if (pagerState.currentPage != target) pagerState.scrollToPage(target)
+            }
+            LaunchedEffect(openPage, visible) {
+                val type = openPage?.trim()?.uppercase().orEmpty()
+                if (type.isEmpty()) return@LaunchedEffect
+                val index = visible.indexOfFirst { it.type == type }
+                if (index >= 0) {
+                    editing = false
+                    pagerState.scrollToPage(index)
+                }
+                onOpenPageConsumed()
             }
             val pageLabels = visible.map { pageLabel(it) }
             val cueIndex = pagerState.currentPage.coerceIn(0, (pageLabels.size - 1).coerceAtLeast(0))
@@ -606,6 +619,7 @@ fun HomeScreen(
                                 onLaunch = onLaunch,
                                 onOpenSystemSettings = onOpenSystemSettings,
                                 active = pagerState.settledPage == page,
+                                namesOnly = state.namesOnly,
                             )
                         }
                     }

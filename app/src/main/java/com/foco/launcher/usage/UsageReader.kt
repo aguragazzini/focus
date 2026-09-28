@@ -9,6 +9,10 @@ import java.time.ZoneId
 data class UsageSnapshot(
     val granted: Boolean,
     val apps: List<UsageApp>,
+    /** Seven local days, oldest first. Empty when the daily buckets were not read. */
+    val days: List<Long> = emptyList(),
+    /** A read failed after the grant. This is not zero usage. */
+    val failed: Boolean = false,
 )
 
 /**
@@ -17,6 +21,18 @@ data class UsageSnapshot(
  */
 object UsageReader {
     fun load(context: Context, nowMillis: Long, zone: ZoneId): UsageSnapshot {
+        return try {
+            loadGranted(context, nowMillis, zone)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: SecurityException) {
+            UsageSnapshot(granted = false, apps = emptyList())
+        } catch (_: Exception) {
+            UsageSnapshot(granted = true, failed = true, apps = emptyList())
+        }
+    }
+
+    private fun loadGranted(context: Context, nowMillis: Long, zone: ZoneId): UsageSnapshot {
         val app = context.applicationContext
         if (!UsageAccess.isGranted(app)) return UsageSnapshot(granted = false, apps = emptyList())
         val manager = app.getSystemService(UsageStatsManager::class.java)
@@ -24,6 +40,7 @@ object UsageReader {
         val (todayStart, weekStart) = UsageReport.bounds(nowMillis, zone)
         val today = read(manager, todayStart, nowMillis) ?: return UsageSnapshot(granted = false, apps = emptyList())
         val week = read(manager, weekStart, nowMillis) ?: return UsageSnapshot(granted = false, apps = emptyList())
+        val spans = readDaily(manager, weekStart, nowMillis) ?: return UsageSnapshot(granted = false, apps = emptyList())
         val pm = app.packageManager
         return UsageSnapshot(
             granted = true,
@@ -33,6 +50,7 @@ object UsageReader {
                 labelOf = { pkg -> label(pm, pkg) },
                 launchable = { pkg -> pm.getLaunchIntentForPackage(pkg) != null },
             ),
+            days = UsageReport.dayTotals(spans, nowMillis, zone),
         )
     }
 
@@ -51,6 +69,21 @@ object UsageReader {
                 manager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end).orEmpty().map { stat ->
                     sample(stat.packageName, stat.totalTimeInForeground)
                 }
+            }
+        } catch (_: SecurityException) {
+            null
+        }
+    }
+
+    /** Daily buckets for the seven-day bar. Totals stay on the aggregated read. */
+    private fun readDaily(manager: UsageStatsManager, start: Long, end: Long): List<UsageSpan>? {
+        if (end <= start) return emptyList()
+        return try {
+            manager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end).orEmpty().map { stat ->
+                UsageSpan(
+                    beginMillis = stat.firstTimeStamp,
+                    foregroundMs = stat.totalTimeInForeground.coerceAtLeast(0L),
+                )
             }
         } catch (_: SecurityException) {
             null
