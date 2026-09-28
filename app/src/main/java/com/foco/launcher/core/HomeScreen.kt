@@ -605,6 +605,7 @@ fun HomeScreen(
                                 title = spec.label,
                                 onLaunch = onLaunch,
                                 onOpenSystemSettings = onOpenSystemSettings,
+                                active = pagerState.settledPage == page,
                             )
                         }
                     }

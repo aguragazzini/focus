@@ -155,6 +155,7 @@
     <string name="uso_chip_week">7 días</string>
     <string name="uso_restricted">Si al volver el acceso sigue sin concederse, en algunos teléfonos: Apps → Foco → ⋮ → Permitir ajustes restringidos.</string>
     <string name="uso_open_fail">No se abrió el acceso de uso.</string>
+    <string name="uso_refresh">Actualizar</string>
     <string name="agenda_permission">Foco necesita permiso para ver los eventos de hoy.</string>
     <string name="agenda_permission_cta">Permitir</string>
     <string name="agenda_permission_settings">Abrir ajustes de Foco</string>

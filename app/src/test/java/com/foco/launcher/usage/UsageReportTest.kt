@@ -85,6 +85,13 @@ class UsageReportTest {
         assertTrue(reader.contains("queryAndAggregateUsageStats"))
         assertTrue(reader.contains("queryUsageStats"))
         assertFalse(reader.contains("queryEvents"))
+        assertFalse(reader.contains("createContextAsUser"))
+        val page = File("src/main/java/com/foco/launcher/core/UsagePage.kt").readText()
+        assertFalse(page.contains("delay("))
+        assertTrue(page.contains("uso_refresh"))
+        assertTrue(page.contains("if (!active) return@LaunchedEffect"))
+        val home = File("src/main/java/com/foco/launcher/core/HomeScreen.kt").readText()
+        assertTrue(home.contains("pagerState.settledPage == page"))
     }
 
     @Test

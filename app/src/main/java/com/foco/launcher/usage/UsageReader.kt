@@ -12,8 +12,8 @@ data class UsageSnapshot(
 )
 
 /**
- * Foreground time for this user only. Work-profile stats are a different user
- * and are not readable from here, so they are omitted rather than filled in.
+ * Foreground time for this process's user. The app's own [UsageStatsManager]
+ * is that user. Work-profile stats are a different user and are not queried.
  */
 object UsageReader {
     fun load(context: Context, nowMillis: Long, zone: ZoneId): UsageSnapshot {

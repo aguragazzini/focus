@@ -24,6 +24,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,7 +51,6 @@ import com.foco.launcher.usage.UsageReader
 import com.foco.launcher.usage.UsageReport
 import com.foco.launcher.usage.UsageSnapshot
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.time.ZoneId
 
@@ -61,6 +61,7 @@ fun UsageHomePage(
     onOpenSystemSettings: () -> Unit,
     modifier: Modifier = Modifier,
     zone: ZoneId = HomeClockFormat.CIVIL_ZONE,
+    active: Boolean = true,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -68,14 +69,13 @@ fun UsageHomePage(
     var byToday by remember { mutableStateOf(true) }
     var asked by remember { mutableStateOf(false) }
     var openFailed by remember { mutableStateOf(false) }
-    LaunchedEffect(lifecycle, zone) {
+    var refreshTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(lifecycle, zone, active, refreshTick) {
+        if (!active) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (true) {
-                val current = System.currentTimeMillis()
-                snapshot = withContext(Dispatchers.IO) {
-                    UsageReader.load(context, current, zone)
-                }
-                delay(60_000L)
+            val current = System.currentTimeMillis()
+            snapshot = withContext(Dispatchers.IO) {
+                UsageReader.load(context, current, zone)
             }
         }
     }
@@ -128,6 +128,7 @@ fun UsageHomePage(
                     byToday = byToday,
                     onToday = { byToday = true },
                     onWeek = { byToday = false },
+                    onRefresh = { refreshTick += 1 },
                 )
             }
             if (rows.isEmpty()) {
@@ -221,6 +222,7 @@ private fun UsageTotal(
     byToday: Boolean,
     onToday: () -> Unit,
     onWeek: () -> Unit,
+    onRefresh: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -242,7 +244,10 @@ private fun UsageTotal(
             Spacer(Modifier.width(FocoSpace.gap))
             UsageChip(stringResource(R.string.uso_chip_week), !byToday, onWeek)
         }
-        Spacer(Modifier.height(FocoSpace.gapLg))
+        FocoTextButton(onClick = onRefresh) {
+            Text(stringResource(R.string.uso_refresh))
+        }
+        Spacer(Modifier.height(FocoSpace.gap))
     }
 }
 
