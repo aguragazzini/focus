@@ -13,6 +13,7 @@ import com.foco.launcher.security.PinGate
 import android.content.Intent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ import com.foco.launcher.work.WorkApp
 class LauncherActivity : ComponentActivity() {
     private lateinit var vm: HomeViewModel
     private var requestEdit by mutableStateOf(false)
+    private var homeToken by mutableIntStateOf(0)
     private var pinAction by mutableStateOf<(() -> Unit)?>(null)
     private var pinWrong by mutableStateOf(false)
     private val calendarPermission = registerForActivityResult(
@@ -158,6 +160,7 @@ class LauncherActivity : ComponentActivity() {
                     onPhonePaused = vm::setPhonePaused,
                     onSilence = vm::setSilence,
                     onPackagePaused = vm::setPackagePaused,
+                    homeToken = homeToken,
                 )
                     val pendingPin = pinAction
                     if (pendingPin != null) {
@@ -189,6 +192,15 @@ class LauncherActivity : ComponentActivity() {
         setIntent(intent)
         if (intent.getBooleanExtra(EXTRA_EDIT_HOME, false)) {
             requestEdit = true
+        } else {
+            homeToken++
+        }
+    }
+
+    override fun onRestart() {
+        super.onRestart()
+        if (!intent.getBooleanExtra(EXTRA_EDIT_HOME, false)) {
+            homeToken++
         }
     }
 

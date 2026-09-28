@@ -178,6 +178,7 @@ fun HomeScreen(
     onRemoveBlock: (String, String) -> Unit = { _, _ -> },
     onMoveBlock: (String, String, Int) -> Unit = { _, _, _ -> },
     onUpdateBlock: (String, com.foco.launcher.registry.PageBlock) -> Unit = { _, _ -> },
+    homeToken: Int = 0,
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -353,6 +354,13 @@ fun HomeScreen(
             LaunchedEffect(visible.size) {
                 val last = (visible.size - 1).coerceAtLeast(0)
                 if (pagerState.currentPage > last) pagerState.scrollToPage(last)
+            }
+            LaunchedEffect(homeToken) {
+                if (homeToken > 0) editing = false
+                val pages = HomePages.visible(state.homePages)
+                val last = (pages.size - 1).coerceAtLeast(0)
+                val target = HomePages.landingIndex(pages).coerceIn(0, last)
+                if (pagerState.currentPage != target) pagerState.scrollToPage(target)
             }
             val pageLabels = visible.map { pageLabel(it) }
             if (editing) {
