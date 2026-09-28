@@ -32,6 +32,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -78,18 +79,26 @@ fun AgendaHomePage(
     LazyColumn(modifier = modifier.fillMaxSize()) {
         item(key = "agenda-head") {
             Spacer(Modifier.height(FocoSpace.gap))
-            Text(
-                text = title.ifBlank { stringResource(R.string.page_agenda) },
-                modifier = Modifier.padding(horizontal = FocoSpace.page),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(FocoSpace.hair))
+            if (title.isNotBlank()) {
+                Text(
+                    text = title,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = FocoSpace.page),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(FocoSpace.hair))
+            }
             Text(
                 text = dateLabel,
-                modifier = Modifier.padding(horizontal = FocoSpace.page),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page),
                 style = MaterialTheme.typography.bodyLarge,
                 color = FocoPaper,
+                textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(FocoSpace.gapLg))
         }
@@ -97,11 +106,18 @@ fun AgendaHomePage(
             item(key = "agenda-wait") { Spacer(Modifier.height(FocoSpace.section)) }
         } else if (!loaded.granted) {
             item(key = "agenda-permission") {
-                Column(Modifier.padding(horizontal = FocoSpace.page)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = FocoSpace.page),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Text(
                         text = stringResource(R.string.agenda_permission),
+                        modifier = Modifier.fillMaxWidth(),
                         style = MaterialTheme.typography.bodyLarge,
                         color = FocoPaper,
+                        textAlign = TextAlign.Center,
                     )
                     FocoTextButton(onClick = onRequestPermission) {
                         Text(stringResource(R.string.agenda_permission_cta))
@@ -129,22 +145,26 @@ fun AgendaHomePage(
                 }
                 if (loaded.workAccess == WorkCalendarAccess.UNREADABLE) {
                     item(key = "agenda-work-blocked") {
-                        Column(Modifier.padding(horizontal = FocoSpace.page)) {
-                            Text(
-                                text = stringResource(R.string.agenda_work_unavailable),
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = FocoPaperDim,
+                        WorkNote(
+                            text = stringResource(R.string.agenda_work_unavailable),
+                            onOpenWorkCalendar = onOpenWorkCalendar,
+                        )
+                    }
+                } else {
+                    if (loaded.workProfileIsolated) {
+                        item(key = "agenda-work-isolated") {
+                            WorkNote(
+                                text = stringResource(R.string.agenda_work_isolated),
+                                onOpenWorkCalendar = onOpenWorkCalendar,
                             )
-                            FocoTextButton(onClick = onOpenWorkCalendar) {
-                                Text(stringResource(R.string.agenda_work_cta))
-                            }
                         }
                     }
-                } else if (loaded.work.isEmpty()) {
-                    item(key = "agenda-work-empty") { EmptyLine() }
-                } else {
-                    items(loaded.work, key = { "w:${it.eventId}:${it.beginMillis}" }) { event ->
-                        AgendaEventRow(event = event, zone = zone, onOpen = { onOpenEvent(event) })
+                    if (loaded.work.isEmpty()) {
+                        item(key = "agenda-work-empty") { EmptyLine() }
+                    } else {
+                        items(loaded.work, key = { "w:${it.eventId}:${it.beginMillis}" }) { event ->
+                            AgendaEventRow(event = event, zone = zone, onOpen = { onOpenEvent(event) })
+                        }
                     }
                 }
             }
@@ -164,19 +184,46 @@ fun AgendaHomePage(
 private fun SectionLabel(text: String) {
     Text(
         text = text,
-        modifier = Modifier.padding(horizontal = FocoSpace.page, vertical = FocoSpace.hair),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = FocoSpace.page, vertical = FocoSpace.hair),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
     )
+}
+
+@Composable
+private fun WorkNote(text: String, onOpenWorkCalendar: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = FocoSpace.page),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.fillMaxWidth(),
+            style = MaterialTheme.typography.bodyLarge,
+            color = FocoPaperDim,
+            textAlign = TextAlign.Center,
+        )
+        FocoTextButton(onClick = onOpenWorkCalendar) {
+            Text(stringResource(R.string.agenda_work_cta))
+        }
+    }
 }
 
 @Composable
 private fun EmptyLine() {
     Text(
         text = stringResource(R.string.agenda_empty),
-        modifier = Modifier.padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
         style = MaterialTheme.typography.bodyLarge,
         color = FocoPaperDim,
+        textAlign = TextAlign.Center,
     )
 }
 

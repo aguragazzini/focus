@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -66,6 +67,9 @@ import com.foco.launcher.core.FocoPrimaryButton
 import com.foco.launcher.core.FocoSpace
 import com.foco.launcher.core.FocoTextButton
 import com.foco.launcher.core.LaunchpadRules
+import com.foco.launcher.core.SilenceControl
+import com.foco.launcher.notification.Silence
+import com.foco.launcher.notification.SilenceLevel
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.security.PinSettingsRow
 import com.foco.launcher.work.WorkCatalogRules
@@ -99,9 +103,12 @@ fun SettingsHost(
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
+    onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
+    onArmSilence: () -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
+    onOpenAllApps: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -118,9 +125,14 @@ fun SettingsHost(
             onWorkPaused = onWorkPaused,
             onNotificationsPaused = onNotificationsPaused,
             onPhonePaused = onPhonePaused,
+            onSilence = onSilence,
+            onArmSilence = onArmSilence,
             onNamesOnly = onNamesOnly,
             onEditHome = onEditHome,
             onRequestCalendar = onRequestCalendar,
+            onOpenAppInfo = onOpenAppInfo,
+            onOpenNlsSettings = onOpenNlsSettings,
+            onOpenAllApps = onOpenAllApps,
         )
         SettingsDest.Edit -> EditAppsScreen(
             state = state,
@@ -178,9 +190,14 @@ private fun SettingsMain(
     onWorkPaused: (Boolean) -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
+    onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
+    onArmSilence: () -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
+    onOpenAppInfo: () -> Unit,
+    onOpenNlsSettings: () -> Unit,
+    onOpenAllApps: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -253,32 +270,32 @@ private fun SettingsMain(
                     PinSettingsRow()
                 }
                 HorizontalDivider()
-                Column(modifier = Modifier.padding(top = 8.dp)) {
-                    Text(
-                        text = stringResource(R.string.settings_avisos_block),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(horizontal = 20.dp),
+                Column(modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)) {
+                    val silence = Silence.level(state.notificationsPaused, state.phonePaused)
+                    SilenceControl(
+                        notificationsPaused = state.notificationsPaused,
+                        phonePaused = state.phonePaused,
+                        listenerReady = state.nlsGranted && state.nlsConnected,
+                        onChange = onSilence,
+                        onActivate = {
+                            onArmSilence()
+                            onOpenNlsSettings()
+                        },
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
                     Text(
                         text = stringResource(
-                            if (state.notificationsPaused) R.string.nls_pause_status else R.string.nls_list_status,
+                            when (silence) {
+                                SilenceLevel.FOCO -> R.string.phone_pause_sub
+                                SilenceLevel.OFF -> R.string.silence_sub
+                            },
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = FocoPaperDim,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.nls_pause),
-                        subtitle = stringResource(R.string.nls_pause_sub),
-                        checked = state.notificationsPaused,
-                        onCheckedChange = onNotificationsPaused,
-                    )
-                    SettingsSwitchRow(
-                        title = stringResource(R.string.phone_pause),
-                        subtitle = stringResource(R.string.phone_pause_sub),
-                        checked = state.phonePaused,
-                        onCheckedChange = onPhonePaused,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 4.dp),
                     )
                 }
                 SettingsRow(
@@ -314,6 +331,12 @@ private fun SettingsMain(
                 HorizontalDivider()
                 SettingsRow(stringResource(R.string.settings_system), onClick = onOpenSystemSettings)
                 HorizontalDivider()
+                RestrictedSettingsBlock(
+                    onOpenAppInfo = onOpenAppInfo,
+                    onOpenNlsSettings = onOpenNlsSettings,
+                    onOpenAllApps = onOpenAllApps,
+                )
+                HorizontalDivider()
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
                     Text(
                         text = stringResource(R.string.settings_version),
@@ -342,6 +365,51 @@ private fun SettingsMain(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RestrictedSettingsBlock(
+    onOpenAppInfo: () -> Unit,
+    onOpenNlsSettings: () -> Unit,
+    onOpenAllApps: () -> Unit,
+) {
+    Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+        Text(
+            text = stringResource(R.string.restricted_title),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        )
+        Text(
+            text = stringResource(R.string.restricted_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.restricted_steps),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        )
+        SettingsRow(
+            title = stringResource(R.string.restricted_app_info),
+            onClick = onOpenAppInfo,
+        )
+        SettingsRow(
+            title = stringResource(R.string.restricted_nls),
+            onClick = onOpenNlsSettings,
+        )
+        SettingsRow(
+            title = stringResource(R.string.restricted_all_apps),
+            onClick = onOpenAllApps,
+        )
     }
 }
 

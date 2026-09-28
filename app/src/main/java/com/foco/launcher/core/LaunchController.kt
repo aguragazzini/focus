@@ -50,7 +50,17 @@ object LaunchController {
         return ResolvedStart.start(context, intent)
     }
 
-    /** App info, where Android 13+ hides "Permitir ajustes restringidos" for a sideload. */
+    /**
+     * All-apps list. On some Android 13+ paths the overflow for restricted
+     * settings shows here and not on the app-info screen Foco opens directly.
+     */
+    fun openAllApps(context: Context): Boolean {
+        val intent = Intent(Settings.ACTION_MANAGE_APPLICATIONS_SETTINGS)
+            .addCategory(Intent.CATEGORY_DEFAULT)
+        return ResolvedStart.start(context, intent)
+    }
+
+    /** App info. Foco cannot add the system overflow menu to this screen. */
     fun openAppDetails(context: Context): Boolean {
         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
             .addCategory(Intent.CATEGORY_DEFAULT)

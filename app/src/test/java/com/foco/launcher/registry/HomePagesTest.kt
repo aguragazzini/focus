@@ -23,6 +23,12 @@ class HomePagesTest {
         )
         assertTrue(pages.none { it.hidden })
         assertEquals(2, HomePages.landingIndex(HomePages.visible(pages)))
+        assertFalse(HomePages.drawsPageTitle(pages[0]))
+        assertFalse(HomePages.drawsPageTitle(pages[1]))
+        assertTrue(HomePages.drawsPageTitle(pages[2]))
+        assertFalse(HomePages.drawsPageTitle(pages[3]))
+        assertTrue(HomePages.drawsPageTitle(pages[4]))
+        assertTrue(HomePages.drawsPageTitle(pages[1].copy(label = "Hoy")))
     }
 
     @Test
@@ -120,6 +126,17 @@ class HomePagesTest {
         assertEquals(legacy.map { it.id }, HomePages.resolve(renamed).map { it.id })
         val reordered = listOf(legacy[1], legacy[0], legacy[2], legacy[3])
         assertFalse(HomePages.resolve(reordered).any { it.type == HomePages.TYPE_AGENDA })
+    }
+
+    @Test
+    fun deletingAgendaStaysGoneAfterTheLayoutIsEdited() {
+        val without = HomePages.delete(HomePages.defaults(), "page-agenda")
+        assertFalse(without.any { it.type == HomePages.TYPE_AGENDA })
+        val spliced = HomePages.resolve(without, layoutEdited = false)
+        assertTrue(spliced.any { it.type == HomePages.TYPE_AGENDA })
+        val kept = HomePages.resolve(without, layoutEdited = true)
+        assertFalse(kept.any { it.type == HomePages.TYPE_AGENDA })
+        assertEquals(4, kept.size)
     }
 
     @Test

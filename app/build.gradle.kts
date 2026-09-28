@@ -13,8 +13,8 @@ android {
         applicationId = "com.foco.launcher"
         minSdk = 26
         targetSdk = 34
-        versionCode = 18
-        versionName = "0.9.3"
+        versionCode = 24
+        versionName = "0.9.9"
     }
 
     signingConfigs {

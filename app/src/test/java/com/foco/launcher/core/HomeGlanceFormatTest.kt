@@ -50,7 +50,10 @@ class HomeGlanceFormatTest {
         assertFalse(blob.contains("weather"))
         val manifest = File("src/main/AndroidManifest.xml").readText()
         assertTrue(manifest.contains("READ_CALENDAR"))
-        assertFalse(manifest.contains("INTERNET"))
+        assertTrue(manifest.contains("INTERNET"))
+        val weather = File("src/main/java/com/foco/launcher/core/CordobaWeather.kt").readText()
+        assertTrue(weather.contains("open-meteo.com"))
+        assertFalse(blob.contains("open-meteo"))
         val agenda = File("src/main/java/com/foco/launcher/core/AgendaAccess.kt").readText()
         assertTrue(agenda.contains("READ_CALENDAR"))
     }

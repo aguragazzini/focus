@@ -61,6 +61,7 @@ class SettingsActivity : ComponentActivity() {
                     onToggleFilter = vm::requestEnableFilter,
                     onOpenNlsSettings = {
                         vm.markNlsSettingsOpened()
+                        if (!NlsStatus.isGranted(this)) vm.armSilenceOnConnect()
                         if (!NlsStatus.openListenerSettings(this)) vm.showNlsOpenFailed()
                     },
                     onOpenAppInfo = {
@@ -76,12 +77,19 @@ class SettingsActivity : ComponentActivity() {
                     onWorkPaused = vm::setWorkSectionPaused,
                     onNotificationsPaused = vm::setNotificationsPaused,
                     onPhonePaused = vm::setPhonePaused,
+                    onSilence = vm::setSilence,
+                    onArmSilence = vm::armSilenceOnConnect,
                     onNamesOnly = vm::setNamesOnly,
                     onEditHome = {
                         startActivity(LauncherActivity.editIntent(this))
                         finish()
                     },
                     onRequestCalendar = { AgendaAccess.request(this, calendarPermission) },
+                    onOpenAllApps = {
+                        if (!LaunchController.openAllApps(this)) {
+                            Toast.makeText(this, R.string.open_fail, Toast.LENGTH_SHORT).show()
+                        }
+                    },
                 )
             }
         }

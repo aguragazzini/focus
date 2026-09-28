@@ -49,6 +49,8 @@ fun HomeClock(
     readGlance: () -> String? = { null },
     underDate: @Composable (LocalDate) -> Unit = {},
     belowGlance: @Composable () -> Unit = {},
+    showDate: Boolean = true,
+    showGlance: Boolean = true,
 ) {
     var now by remember { mutableLongStateOf(nowMillis()) }
     var glance by remember { mutableStateOf(HomeGlance.peek()?.trim()?.takeIf { it.isNotEmpty() }) }
@@ -98,29 +100,31 @@ fun HomeClock(
             ),
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(FocoSpace.hair))
-        Text(
-            text = date,
-            modifier = Modifier
-                .clickable(onClick = onOpenCalendar)
-                .clearAndSetSemantics {
-                    contentDescription = dateCd
-                    role = Role.Button
-                    onClick { onOpenCalendar(); true }
-                }
-                .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.hair),
-            style = TextStyle(
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Normal,
-                fontSize = HomeClockFormat.DATE_SP.sp,
-                lineHeight = 18.sp,
-                color = FocoPaperDim,
-            ),
-            textAlign = TextAlign.Center,
-        )
+        if (showDate) {
+            Spacer(Modifier.height(FocoSpace.hair))
+            Text(
+                text = date,
+                modifier = Modifier
+                    .clickable(onClick = onOpenCalendar)
+                    .clearAndSetSemantics {
+                        contentDescription = dateCd
+                        role = Role.Button
+                        onClick { onOpenCalendar(); true }
+                    }
+                    .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.hair),
+                style = TextStyle(
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = HomeClockFormat.DATE_SP.sp,
+                    lineHeight = 18.sp,
+                    color = FocoPaperDim,
+                ),
+                textAlign = TextAlign.Center,
+            )
+        }
         Spacer(Modifier.height(FocoSpace.gap))
         underDate(day)
-        if (!glance.isNullOrBlank()) {
+        if (showGlance && !glance.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(
                 text = glance.orEmpty(),

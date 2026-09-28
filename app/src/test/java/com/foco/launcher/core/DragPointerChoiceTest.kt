@@ -40,9 +40,9 @@ class DragPointerChoiceTest {
     }
 
     @Test
-    fun slowHorizontalDriftIsHeldUntilTheArm() {
+    fun horizontalMoveBeforeTheArmYieldsToThePager() {
         assertEquals(
-            DragPointerChoice.HoldStill,
+            DragPointerChoice.Yield,
             dragPointerChoice(
                 elapsedMs = 80,
                 totalX = slop + 4f,

@@ -4,10 +4,11 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.util.Locale
 
 /**
- * Today's events in the civil zone. Personal and Trabajo stay on the side
- * the provider already assigned. A calendar name never moves an event.
+ * Today's events in the civil zone. [select] keeps the side already on the row.
+ * A calendar is moved to Trabajo only by [looksLikeWork], before select.
  */
 enum class AgendaSide {
     PERSONAL,
@@ -33,6 +34,7 @@ data class AgendaRow(
     val color: Int,
     val status: Int?,
     val side: AgendaSide,
+    val calendarId: Long = 0,
 )
 
 data class AgendaEvent(
@@ -52,11 +54,56 @@ data class AgendaSnapshot(
     val personal: List<AgendaEvent>,
     val work: List<AgendaEvent>,
     val workAccess: WorkCalendarAccess,
+    /**
+     * The work profile's own calendars were not readable. Trabajo rows, if any,
+     * come from calendars in this profile that look like work.
+     */
+    val workProfileIsolated: Boolean = false,
 )
 
 object AgendaDay {
     /** AOSP EventsColumns.STATUS_CANCELED. Passed in so tests do not read the stub jar. */
     const val STATUS_CANCELED = 2
+
+    private val esAr = Locale("es", "AR")
+    private val words = Regex("[^\\p{L}\\p{N}]+")
+    private val workWords = setOf("work", "trabajo")
+    private val workAccountTypes = setOf("work", "exchange", "activesync")
+
+    /**
+     * Confident work calendars only. A whole word "work" or "trabajo" in the
+     * display name or account name counts. "Homework", "workshop", and "Network"
+     * do not. Account types match a segment: exchange, activesync, or work.
+     * An email domain is not a guess, and "oficina" is not enough.
+     */
+    fun looksLikeWork(displayName: String, accountName: String, accountType: String): Boolean {
+        if (wordsOf(displayName).any { it in workWords }) return true
+        if (wordsOf(accountName).any { it in workWords }) return true
+        return wordsOf(accountType).any { it in workAccountTypes }
+    }
+
+    /**
+     * Enterprise rows win. A personal row with the same title and start is the
+     * same event and is dropped, unless it is the only copy that has a calendar name.
+     */
+    fun mergeWork(enterprise: List<AgendaRow>, personalWork: List<AgendaRow>): List<AgendaRow> {
+        val byKey = LinkedHashMap<String, AgendaRow>()
+        for (row in enterprise + personalWork) {
+            val key = "${row.title.trim().lowercase(esAr)}:${row.beginMillis}:${row.allDay}"
+            val existing = byKey[key]
+            val stamped = if (row.side == AgendaSide.WORK) row else row.copy(side = AgendaSide.WORK)
+            if (existing == null) {
+                byKey[key] = stamped
+            } else if (existing.calendarName.isBlank() && stamped.calendarName.isNotBlank()) {
+                byKey[key] = stamped
+            }
+        }
+        return byKey.values.toList()
+    }
+
+    private fun wordsOf(value: String): List<String> {
+        return value.lowercase(esAr).split(words).filter { it.isNotEmpty() }
+    }
 
     fun dayOf(epochMillis: Long, zone: ZoneId): LocalDate {
         return Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()

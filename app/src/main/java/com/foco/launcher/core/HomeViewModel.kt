@@ -15,9 +15,12 @@ import com.foco.launcher.registry.GroupMutations
 import com.foco.launcher.registry.GroupSection
 import com.foco.launcher.registry.HomePageSpec
 import com.foco.launcher.registry.HomePages
+import com.foco.launcher.registry.PageBlock
+import com.foco.launcher.registry.PageBlocks
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.WhitelistMutations
+import com.foco.launcher.registry.WhitelistOrder
 import com.foco.launcher.registry.withEntries
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkApp
@@ -57,6 +60,7 @@ data class HomeUiState(
     val workSectionPaused: Boolean = false,
     val notificationsPaused: Boolean = false,
     val phonePaused: Boolean = false,
+    val nlsReady: Boolean = false,
     val pausedPackages: List<String> = emptyList(),
     val namesOnly: Boolean = false,
     val homePages: List<HomePageSpec> = HomePages.defaults(),
@@ -262,6 +266,30 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun armSilenceOnConnect() {
+        viewModelScope.launch {
+            app.prefsStore.update { it.copy(silenceArmOnConnect = true) }
+        }
+    }
+
+    fun setSilence(level: com.foco.launcher.notification.SilenceLevel) {
+        viewModelScope.launch {
+            try {
+                app.prefsStore.setSilence(
+                    notificationsPaused = com.foco.launcher.notification.Silence.notificationsPaused(level),
+                    phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
+                )
+            } catch (_: Exception) {
+                if (level == com.foco.launcher.notification.SilenceLevel.FOCO) {
+                    runCatching {
+                        app.prefsStore.setSilence(notificationsPaused = false, phonePaused = false)
+                    }
+                    message.value = getApplication<Application>().getString(R.string.silence_fail)
+                }
+            }
+        }
+    }
+
     fun setPackagePaused(packageName: String, paused: Boolean) {
         viewModelScope.launch {
             app.prefsStore.setPackagePaused(packageName, paused)
@@ -366,9 +394,10 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             workSectionPaused = snap.prefs.workSectionPaused,
             notificationsPaused = snap.prefs.notificationsPaused,
             phonePaused = snap.prefs.phonePaused,
+            nlsReady = granted && listenerConnected,
             pausedPackages = snap.prefs.pausedPackages,
             namesOnly = snap.prefs.namesOnly,
-            homePages = HomePages.resolve(snap.prefs.pages),
+            homePages = HomePages.resolve(snap.prefs.pages, snap.prefs.pageLayoutEdited),
         )
     }
 
@@ -394,12 +423,44 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         editPages { HomePages.delete(it, id) }
     }
 
+    fun addHomeBlock(pageId: String, type: String) {
+        editBlocks(pageId) { PageBlocks.add(it, type, UUID.randomUUID().toString()) }
+    }
+
+    fun removeHomeBlock(pageId: String, blockId: String) {
+        editBlocks(pageId) { PageBlocks.remove(it, blockId) }
+    }
+
+    fun moveHomeBlock(pageId: String, blockId: String, delta: Int) {
+        editBlocks(pageId) { PageBlocks.move(it, blockId, delta) }
+    }
+
+    fun updateHomeBlock(pageId: String, block: PageBlock) {
+        editBlocks(pageId) { blocks -> blocks.map { if (it.id == block.id) block else it } }
+    }
+
+    private fun editBlocks(pageId: String, transform: (List<PageBlock>) -> List<PageBlock>) {
+        editPages { pages ->
+            pages.map { page ->
+                if (page.id != pageId) {
+                    page
+                } else {
+                    page.copy(blocks = transform(PageBlocks.effective(page)), blocksSet = true)
+                }
+            }
+        }
+    }
+
     private fun editPages(transform: (List<HomePageSpec>) -> List<HomePageSpec>) {
         viewModelScope.launch {
             app.prefsStore.update { prefs ->
-                val current = HomePages.resolve(prefs.pages)
+                val current = HomePages.resolve(prefs.pages, prefs.pageLayoutEdited)
                 val next = transform(current)
-                if (next == current && prefs.pages == current) prefs else prefs.copy(pages = next)
+                if (next == current && prefs.pages == current && prefs.pageLayoutEdited) {
+                    prefs
+                } else {
+                    prefs.copy(pages = next, pageLayoutEdited = true)
+                }
             }
         }
     }
@@ -414,9 +475,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun visible(prefs: LauncherPrefs, all: List<LaunchableApp>): List<LaunchableApp> {
         if (all.isEmpty()) return emptyList()
         val byPkg = all.associateBy { it.packageName }
-        return prefs.entries
-            .sortedBy { it.order }
-            .mapNotNull { byPkg[it.packageName] }
+        return WhitelistOrder.displayed(prefs.entries, prefs.whitelistCustomOrder) { pkg ->
+            byPkg[pkg]?.label ?: pkg
+        }.mapNotNull { byPkg[it.packageName] }
     }
 
     companion object {

@@ -286,9 +286,8 @@ internal fun LayoutCoordinates.toDragBounds(): GroupDrag.Bounds {
 internal enum class DragPointerChoice { Wait, HoldStill, Arm, Drag, Yield, LongPress }
 
 /**
- * A flick still leaves the tile so the pager or the list can move.
- * A slow horizontal drift is consumed so the pager does not steal the hold.
- * Past [DRAG_ARM_MS], movement becomes a group drag.
+ * Before [DRAG_ARM_MS], a horizontal move past slop is a page swipe and is not consumed.
+ * A vertical move is the list. A finger that stays inside slop until the arm time can then drag to group.
  */
 internal fun dragPointerChoice(
     elapsedMs: Long,
@@ -310,11 +309,7 @@ internal fun dragPointerChoice(
     if (elapsedMs >= DRAG_ARM_MS && distance <= wide) {
         return if (distance > slop) DragPointerChoice.Drag else DragPointerChoice.Arm
     }
-    if (distance > slop && elapsedMs < DRAG_ARM_MS) {
-        if (abs(totalY) > abs(totalX)) return DragPointerChoice.Yield
-        if (abs(totalX) > wide) return DragPointerChoice.Yield
-        return DragPointerChoice.HoldStill
-    }
+    if (distance > slop) return DragPointerChoice.Yield
     if (wantsLongPress && elapsedMs >= longPressMs && distance <= wide) {
         return DragPointerChoice.LongPress
     }

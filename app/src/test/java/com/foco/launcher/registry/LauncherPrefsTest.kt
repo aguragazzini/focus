@@ -28,5 +28,6 @@ class LauncherPrefsTest {
         assertFalse(LauncherPrefs().workSectionPaused)
         assertFalse(LauncherPrefs().notificationsPaused)
         assertFalse(LauncherPrefs().namesOnly)
+        assertFalse(LauncherPrefs().whitelistCustomOrder)
     }
 }

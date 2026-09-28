@@ -62,7 +62,7 @@ class PackageRegistry(
                     val listed = withContext(Dispatchers.Default) {
                         loadListed(prefs.entries.map { it.packageName })
                     }
-                    publishHome(listed)
+                    publishHome(prefs, listed)
                 }
             }
         }
@@ -80,7 +80,7 @@ class PackageRegistry(
             val listed = withContext(Dispatchers.Default) {
                 loadListed(prefs.entries.map { it.packageName })
             }
-            publishHome(listed)
+            publishHome(prefs, listed)
         }
     }
 
@@ -128,10 +128,7 @@ class PackageRegistry(
 
     suspend fun visibleApps(prefs: LauncherPrefs): List<LaunchableApp> {
         if (!_loaded.value) warmHomeIcons()
-        val apps = cache.get().associateBy { it.packageName }
-        return prefs.entries
-            .sortedBy { it.order }
-            .mapNotNull { apps[it.packageName] }
+        return orderedSlice(prefs, cache.get())
     }
 
     suspend fun pruneUninstalled() {
@@ -189,22 +186,27 @@ class PackageRegistry(
     }
 
     private fun publishHomeSlice(prefs: LauncherPrefs, all: List<LaunchableApp>) {
-        val byPkg = all.associateBy { it.packageName }
-        val next = prefs.entries
-            .sortedBy { it.order }
-            .mapNotNull { byPkg[it.packageName] }
+        val next = orderedSlice(prefs, all)
         if (next == _homeApps.value) return
         _homeApps.value = next
     }
 
-    private suspend fun publishHome(apps: List<LaunchableApp>) {
+    private suspend fun publishHome(prefs: LauncherPrefs, apps: List<LaunchableApp>) {
+        val next = orderedSlice(prefs, apps)
         publishMutex.withLock {
-            _homeApps.value = apps
+            _homeApps.value = next
             _loaded.value = true
             if (_catalogLoaded.value) return@withLock
             cache.set(apps)
             _launchables.value = apps
         }
+    }
+
+    private fun orderedSlice(prefs: LauncherPrefs, all: List<LaunchableApp>): List<LaunchableApp> {
+        val byPkg = all.associateBy { it.packageName }
+        return WhitelistOrder.displayed(prefs.entries, prefs.whitelistCustomOrder) { pkg ->
+            byPkg[pkg]?.label ?: pkg
+        }.mapNotNull { byPkg[it.packageName] }
     }
 
     private fun loadListed(packageNames: List<String>): List<LaunchableApp> {
@@ -235,7 +237,11 @@ class PackageRegistry(
         try {
             val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
             val resolved = pm.queryIntentActivities(intent, 0)
-            return resolved.mapNotNull { toLaunchable(it) }.sortedBy { it.label.lowercase() }
+            return AppOrder.byLabel(
+                items = resolved.mapNotNull { toLaunchable(it) },
+                label = { it.label },
+                tieBreak = { it.packageName },
+            )
         } finally {
             Process.setThreadPriority(previous)
         }
