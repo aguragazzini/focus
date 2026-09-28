@@ -391,7 +391,7 @@ fun HomeScreen(
                 if (pagerState.currentPage > last) pagerState.scrollToPage(last)
             }
             LaunchedEffect(homeToken) {
-                if (homeToken > 0) editing = false
+                if (homeToken > 0 && !requestEdit) editing = false
                 if (!openPage.isNullOrBlank()) return@LaunchedEffect
                 val pages = HomePages.visible(state.homePages)
                 val last = (pages.size - 1).coerceAtLeast(0)
@@ -1743,7 +1743,7 @@ private fun HomePagerCue(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = onEdit)
+            .combinedClickable(onClick = onEdit, onLongClick = onEdit)
             .padding(top = FocoSpace.hair, bottom = FocoSpace.gap),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -1753,7 +1753,10 @@ private fun HomePagerCue(
                 Box(
                     modifier = Modifier
                         .size(FocoSpace.touch)
-                        .clickable { onSelect(index) }
+                        .combinedClickable(
+                            onClick = { onSelect(index) },
+                            onLongClick = onEdit,
+                        )
                         .semantics { contentDescription = label },
                     contentAlignment = Alignment.Center,
                 ) {

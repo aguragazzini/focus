@@ -33,6 +33,7 @@ class LauncherActivity : ComponentActivity() {
     private var openPage by mutableStateOf<String?>(null)
     private var pinAction by mutableStateOf<(() -> Unit)?>(null)
     private var pinWrong by mutableStateOf(false)
+    private var leftHome = false
     private val calendarPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { }
@@ -211,14 +212,23 @@ class LauncherActivity : ComponentActivity() {
 
     override fun onRestart() {
         super.onRestart()
-        if (intent.getBooleanExtra(EXTRA_EDIT_HOME, false)) return
-        if (readOpenPage(intent) != null || openPage != null) return
-        homeToken++
+        // The edit / open-page extra arrives in onNewIntent, which is after this.
+        leftHome = true
     }
 
     override fun onResume() {
         super.onResume()
         if (::vm.isInitialized) vm.onResume()
+        if (!leftHome) return
+        leftHome = false
+        val page = readOpenPage(intent) ?: openPage
+        if (HomeReturn.resets(
+                editRequested = intent.getBooleanExtra(EXTRA_EDIT_HOME, false) || requestEdit,
+                openPage = page,
+            )
+        ) {
+            homeToken++
+        }
     }
 
     companion object {
