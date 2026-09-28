@@ -151,6 +151,10 @@ class LauncherActivity : ComponentActivity() {
                     onMovePage = vm::moveHomePage,
                     onHidePage = vm::setHomePageHidden,
                     onDeletePage = vm::deleteHomePage,
+                    onAddBlock = vm::addHomeBlock,
+                    onRemoveBlock = vm::removeHomeBlock,
+                    onMoveBlock = vm::moveHomeBlock,
+                    onUpdateBlock = vm::updateHomeBlock,
                     onPhonePaused = vm::setPhonePaused,
                     onPackagePaused = vm::setPackagePaused,
                 )

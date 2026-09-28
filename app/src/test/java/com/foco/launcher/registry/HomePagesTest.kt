@@ -123,6 +123,17 @@ class HomePagesTest {
     }
 
     @Test
+    fun deletingAgendaStaysGoneAfterTheLayoutIsEdited() {
+        val without = HomePages.delete(HomePages.defaults(), "page-agenda")
+        assertFalse(without.any { it.type == HomePages.TYPE_AGENDA })
+        val spliced = HomePages.resolve(without, layoutEdited = false)
+        assertTrue(spliced.any { it.type == HomePages.TYPE_AGENDA })
+        val kept = HomePages.resolve(without, layoutEdited = true)
+        assertFalse(kept.any { it.type == HomePages.TYPE_AGENDA })
+        assertEquals(4, kept.size)
+    }
+
+    @Test
     fun oldPrefsWithoutPagesDecodeToTheDefaultLayout() {
         val json = Json {
             ignoreUnknownKeys = true

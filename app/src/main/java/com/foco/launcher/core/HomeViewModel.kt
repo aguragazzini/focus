@@ -15,6 +15,8 @@ import com.foco.launcher.registry.GroupMutations
 import com.foco.launcher.registry.GroupSection
 import com.foco.launcher.registry.HomePageSpec
 import com.foco.launcher.registry.HomePages
+import com.foco.launcher.registry.PageBlock
+import com.foco.launcher.registry.PageBlocks
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.WhitelistMutations
@@ -369,7 +371,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             phonePaused = snap.prefs.phonePaused,
             pausedPackages = snap.prefs.pausedPackages,
             namesOnly = snap.prefs.namesOnly,
-            homePages = HomePages.resolve(snap.prefs.pages),
+            homePages = HomePages.resolve(snap.prefs.pages, snap.prefs.pageLayoutEdited),
         )
     }
 
@@ -395,12 +397,44 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         editPages { HomePages.delete(it, id) }
     }
 
+    fun addHomeBlock(pageId: String, type: String) {
+        editBlocks(pageId) { PageBlocks.add(it, type, UUID.randomUUID().toString()) }
+    }
+
+    fun removeHomeBlock(pageId: String, blockId: String) {
+        editBlocks(pageId) { PageBlocks.remove(it, blockId) }
+    }
+
+    fun moveHomeBlock(pageId: String, blockId: String, delta: Int) {
+        editBlocks(pageId) { PageBlocks.move(it, blockId, delta) }
+    }
+
+    fun updateHomeBlock(pageId: String, block: PageBlock) {
+        editBlocks(pageId) { blocks -> blocks.map { if (it.id == block.id) block else it } }
+    }
+
+    private fun editBlocks(pageId: String, transform: (List<PageBlock>) -> List<PageBlock>) {
+        editPages { pages ->
+            pages.map { page ->
+                if (page.id != pageId) {
+                    page
+                } else {
+                    page.copy(blocks = transform(PageBlocks.effective(page)), blocksSet = true)
+                }
+            }
+        }
+    }
+
     private fun editPages(transform: (List<HomePageSpec>) -> List<HomePageSpec>) {
         viewModelScope.launch {
             app.prefsStore.update { prefs ->
-                val current = HomePages.resolve(prefs.pages)
+                val current = HomePages.resolve(prefs.pages, prefs.pageLayoutEdited)
                 val next = transform(current)
-                if (next == current && prefs.pages == current) prefs else prefs.copy(pages = next)
+                if (next == current && prefs.pages == current && prefs.pageLayoutEdited) {
+                    prefs
+                } else {
+                    prefs.copy(pages = next, pageLayoutEdited = true)
+                }
             }
         }
     }

@@ -41,6 +41,11 @@ data class LauncherPrefs(
      * Unknown or all-hidden lists are restored by [HomePages.resolve], not here.
      */
     val pages: List<HomePageSpec> = emptyList(),
+    /**
+     * The user has created, renamed, reordered, hidden, or deleted a page.
+     * Stops the 0.9.2 four-page list from gaining Agenda again after a delete.
+     */
+    val pageLayoutEdited: Boolean = false,
 ) {
     /** Andrés: personal packages that may notify. Derived from home + allowNotif. */
     val notificationAllowlist: Set<String>

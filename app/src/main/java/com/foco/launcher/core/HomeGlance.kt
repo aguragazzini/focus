@@ -21,6 +21,10 @@ object HomeGlance {
         return value
     }
 
+    fun battery(context: Context): Int? = batteryPercent(context)
+
+    fun nextAlarm(context: Context, zone: ZoneId = ZoneId.systemDefault()): String? = alarmLabel(context, zone)
+
     fun line(context: Context, zone: ZoneId = ZoneId.systemDefault()): String? {
         return runCatching {
             HomeGlanceFormat.line(batteryPercent(context), alarmLabel(context, zone))

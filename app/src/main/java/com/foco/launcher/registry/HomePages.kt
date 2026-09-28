@@ -13,6 +13,10 @@ data class HomePageSpec(
     val type: String,
     val label: String = "",
     val hidden: Boolean = false,
+    /** Empty until the user edits blocks. [PageBlocks.effective] supplies the type default. */
+    val blocks: List<PageBlock> = emptyList(),
+    /** True once the user has added, removed, or reordered blocks on this page. */
+    val blocksSet: Boolean = false,
 )
 
 object HomePages {
@@ -34,8 +38,12 @@ object HomePages {
         HomePageSpec(id = "page-work", type = TYPE_WORK),
     )
 
-    /** Drop unknown rows. Empty, or nothing left visible, restores [defaults]. */
-    fun resolve(raw: List<HomePageSpec>): List<HomePageSpec> {
+    /**
+     * Drop unknown rows. Empty, or nothing left visible, restores [defaults].
+     * [layoutEdited] skips the one-time Agenda splice. Without it, deleting
+     * Agenda from the defaults looks like the old four-page layout and comes back.
+     */
+    fun resolve(raw: List<HomePageSpec>, layoutEdited: Boolean = false): List<HomePageSpec> {
         if (raw.isEmpty()) return defaults()
         val cleaned = ArrayList<HomePageSpec>(raw.size)
         val seen = HashSet<String>()
@@ -44,10 +52,11 @@ object HomePages {
             val id = spec.id.trim()
             if (type !in TYPES || id.isEmpty() || !seen.add(id)) continue
             val label = spec.label.trim().replace(Regex("\\s+"), " ").take(GroupMutations.NAME_MAX)
-            cleaned += spec.copy(id = id, type = type, label = label)
+            val blocks = PageBlocks.clean(spec.blocks)
+            cleaned += spec.copy(id = id, type = type, label = label, blocks = blocks)
         }
         if (cleaned.isEmpty() || cleaned.none { !it.hidden }) return defaults()
-        return legacyDefaultWithAgenda(cleaned)
+        return if (layoutEdited) cleaned else legacyDefaultWithAgenda(cleaned)
     }
 
     /**

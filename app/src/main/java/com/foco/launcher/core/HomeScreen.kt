@@ -172,6 +172,10 @@ fun HomeScreen(
     onDeletePage: (String) -> Unit = {},
     onPhonePaused: (Boolean) -> Unit = {},
     onPackagePaused: (String, Boolean) -> Unit = { _, _ -> },
+    onAddBlock: (String, String) -> Unit = { _, _ -> },
+    onRemoveBlock: (String, String) -> Unit = { _, _ -> },
+    onMoveBlock: (String, String, Int) -> Unit = { _, _, _ -> },
+    onUpdateBlock: (String, com.foco.launcher.registry.PageBlock) -> Unit = { _, _ -> },
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -349,6 +353,26 @@ fun HomeScreen(
                 if (pagerState.currentPage > last) pagerState.scrollToPage(last)
             }
             val pageLabels = visible.map { pageLabel(it) }
+            if (editing) {
+                HomeEditor(
+                    pages = state.homePages,
+                    apps = state.apps,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth(),
+                    onRename = onRenamePage,
+                    onMove = onMovePage,
+                    onHide = onHidePage,
+                    onDelete = onDeletePage,
+                    onCreate = onCreatePage,
+                    onAddBlock = onAddBlock,
+                    onRemoveBlock = onRemoveBlock,
+                    onMoveBlock = onMoveBlock,
+                    onUpdateBlock = onUpdateBlock,
+                    onDismiss = { editing = false },
+                )
+            }
+            if (!editing) {
             HomePagerCue(
                 labels = pageLabels,
                 page = pagerState.currentPage.coerceIn(0, (pageLabels.size - 1).coerceAtLeast(0)),
@@ -371,19 +395,42 @@ fun HomeScreen(
                 val spec = visible.getOrNull(page)
                 when (spec?.type) {
                     HomePages.TYPE_CLOCK -> ClockHomePage(
+                        blocks = com.foco.launcher.registry.PageBlocks.effective(spec),
+                        state = state,
                         onOpenClock = onOpenClock,
                         onOpenCalendar = onOpenCalendar,
                         onOpenSystemSettings = onOpenSystemSettings,
+                        onNotificationsPaused = onNotificationsPaused,
+                        onPhonePaused = onPhonePaused,
+                        onLaunch = onLaunch,
+                        onUpdateBlock = { onUpdateBlock(spec.id, it) },
                     )
-                    HomePages.TYPE_AGENDA -> AgendaHomePage(
-                        title = spec.label,
-                        hasWorkProfile = state.hasWorkProfile,
-                        onRequestPermission = onRequestCalendar,
-                        onOpenAppSettings = onOpenAppSettings,
-                        onOpenEvent = onOpenAgendaEvent,
-                        onOpenWorkCalendar = onOpenWorkCalendar,
-                        onOpenSystemSettings = onOpenSystemSettings,
-                    )
+                    HomePages.TYPE_AGENDA -> {
+                        val blocks = com.foco.launcher.registry.PageBlocks.effective(spec)
+                        if (blocks.size == 1 && blocks[0].type == com.foco.launcher.registry.PageBlocks.AGENDA) {
+                            AgendaHomePage(
+                                title = spec.label,
+                                hasWorkProfile = state.hasWorkProfile,
+                                onRequestPermission = onRequestCalendar,
+                                onOpenAppSettings = onOpenAppSettings,
+                                onOpenEvent = onOpenAgendaEvent,
+                                onOpenWorkCalendar = onOpenWorkCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                            )
+                        } else {
+                            BlockPage(
+                                blocks = blocks,
+                                state = state,
+                                onOpenClock = onOpenClock,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                onNotificationsPaused = onNotificationsPaused,
+                                onPhonePaused = onPhonePaused,
+                                onLaunch = onLaunch,
+                                onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                            )
+                        }
+                    }
                     HomePages.TYPE_PERSONAL -> PersonalHomePage(
                         state = state,
                         arranged = personalArranged,
@@ -411,6 +458,20 @@ fun HomeScreen(
                         },
                         onDrag = { window -> moveDrag(window) },
                         onDragEnd = { endDrag() },
+                        header = {
+                            BlockPage(
+                                blocks = com.foco.launcher.registry.PageBlocks.effective(spec),
+                                state = state,
+                                onOpenClock = onOpenClock,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                onNotificationsPaused = onNotificationsPaused,
+                                onPhonePaused = onPhonePaused,
+                                onLaunch = onLaunch,
+                                onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                                scroll = false,
+                            )
+                        },
                     )
                     HomePages.TYPE_APPS -> PersonalHomePage(
                         state = state,
@@ -440,6 +501,20 @@ fun HomeScreen(
                         },
                         onDrag = { window -> moveDrag(window) },
                         onDragEnd = { endDrag() },
+                        header = {
+                            BlockPage(
+                                blocks = com.foco.launcher.registry.PageBlocks.effective(spec),
+                                state = state,
+                                onOpenClock = onOpenClock,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                onNotificationsPaused = onNotificationsPaused,
+                                onPhonePaused = onPhonePaused,
+                                onLaunch = onLaunch,
+                                onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                                scroll = false,
+                            )
+                        },
                     )
                     HomePages.TYPE_DIET -> {
                         val meals = remember(context) {
@@ -449,10 +524,25 @@ fun HomeScreen(
                                 }
                             }.getOrNull()?.also { DietPlan.store(it) }
                         }
-                        DietPage(
-                            plan = meals,
-                            onOpenSystemSettings = onOpenSystemSettings,
-                        )
+                        val blocks = com.foco.launcher.registry.PageBlocks.effective(spec)
+                        if (blocks.size == 1 && blocks[0].type == com.foco.launcher.registry.PageBlocks.COMIDA) {
+                            DietPage(
+                                plan = meals,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                            )
+                        } else {
+                            BlockPage(
+                                blocks = blocks,
+                                state = state,
+                                onOpenClock = onOpenClock,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                onNotificationsPaused = onNotificationsPaused,
+                                onPhonePaused = onPhonePaused,
+                                onLaunch = onLaunch,
+                                onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                            )
+                        }
                     }
                     HomePages.TYPE_WORK -> WorkHomePage(
                         state = state,
@@ -482,11 +572,25 @@ fun HomeScreen(
                         },
                         onDrag = { window -> moveDrag(window) },
                         onDragEnd = { endDrag() },
+                        header = {
+                            BlockPage(
+                                blocks = com.foco.launcher.registry.PageBlocks.effective(spec),
+                                state = state,
+                                onOpenClock = onOpenClock,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                onNotificationsPaused = onNotificationsPaused,
+                                onPhonePaused = onPhonePaused,
+                                onLaunch = onLaunch,
+                                onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                                scroll = false,
+                            )
+                        },
                     )
                     else -> Unit
                 }
             }
-        }
+            }
 
         val openGroup = openedGroupId?.let { id -> state.groups.find { it.id == id } }
         if (openGroup != null) {
@@ -731,123 +835,200 @@ fun HomeScreen(
         )
     }
 
-    if (editing) {
-        HomeEditSheet(
-            pages = state.homePages,
-            onRename = onRenamePage,
-            onMove = onMovePage,
-            onHide = onHidePage,
-            onDelete = onDeletePage,
-            onCreate = onCreatePage,
-            onDismiss = { editing = false },
-        )
-    }
         }
+    }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun HomeEditSheet(
+private fun HomeEditor(
     pages: List<HomePageSpec>,
+    apps: List<com.foco.launcher.registry.LaunchableApp>,
     onRename: (String, String) -> Unit,
     onMove: (String, Int) -> Unit,
     onHide: (String, Boolean) -> Unit,
     onDelete: (String) -> Unit,
     onCreate: (String, String) -> Unit,
+    onAddBlock: (String, String) -> Unit,
+    onRemoveBlock: (String, String) -> Unit,
+    onMoveBlock: (String, String, Int) -> Unit,
+    onUpdateBlock: (String, com.foco.launcher.registry.PageBlock) -> Unit,
     onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    var picking by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf("pages") }
     var renameId by remember { mutableStateOf<String?>(null) }
+    var blocksPageId by remember { mutableStateOf<String?>(null) }
+    val blocksPage = pages.find { it.id == blocksPageId }
     val renameTarget = pages.find { it.id == renameId }
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = FocoInkElevated,
-        contentColor = FocoPaper,
-        tonalElevation = 0.dp,
-        dragHandle = { BottomSheetDefaults.DragHandle(color = FocoPaperDim) },
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(start = FocoSpace.page, end = FocoSpace.page, bottom = FocoSpace.sheet),
+    Column(modifier = modifier.padding(horizontal = FocoSpace.page)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
+            Text(
+                text = stringResource(
+                    if (blocksPage != null) R.string.home_edit_blocks else R.string.home_edit,
+                ),
+                style = MaterialTheme.typography.bodyLarge,
+                color = FocoPaper,
+            )
+            FocoTextButton(onClick = {
+                if (blocksPage != null || mode != "pages") {
+                    blocksPageId = null
+                    mode = "pages"
+                } else {
+                    onDismiss()
+                }
+            }) {
                 Text(
-                    text = stringResource(R.string.home_edit),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = FocoPaper,
+                    stringResource(
+                        if (blocksPage != null || mode != "pages") R.string.home_blocks_back else R.string.home_edit_done,
+                    ),
                 )
-                FocoTextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.home_edit_done))
+            }
+        }
+        when {
+            blocksPage != null && mode == "catalog" -> {
+                val current = com.foco.launcher.registry.PageBlocks.effective(blocksPage)
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    items(com.foco.launcher.registry.PageBlocks.ALL, key = { it }) { type ->
+                        val taken = !com.foco.launcher.registry.PageBlocks.allowsDuplicate(type) &&
+                            current.any { it.type == type }
+                        Text(
+                            text = blockLabel(type) + if (taken) " · " + stringResource(R.string.home_blocks_have) else "",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = !taken) {
+                                    onAddBlock(blocksPage.id, type)
+                                    mode = "blocks"
+                                }
+                                .padding(vertical = 14.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (taken) FocoPaperDim else FocoPaper,
+                        )
+                    }
                 }
             }
-            val visibleCount = pages.count { !it.hidden }
-            pages.forEachIndexed { index, page ->
-                val name = pageLabel(page)
-                Text(
-                    text = name,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { renameId = page.id }
-                        .padding(top = 14.dp),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = if (page.hidden) FocoPaperDim else FocoPaper,
-                )
-                Text(
-                    text = if (page.hidden) {
-                        stringResource(R.string.home_edit_hidden)
-                    } else {
-                        pageLabel(page.copy(label = ""))
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = FocoPaperDim,
-                )
-                Row {
-                    if (index > 0) {
-                        FocoTextButton(onClick = { onMove(page.id, -1) }) {
-                            Text(stringResource(R.string.home_edit_up))
-                        }
-                    }
-                    if (index < pages.lastIndex) {
-                        FocoTextButton(onClick = { onMove(page.id, 1) }) {
-                            Text(stringResource(R.string.home_edit_down))
-                        }
-                    }
-                    if (page.hidden || visibleCount > 1) {
-                        FocoTextButton(onClick = { onHide(page.id, !page.hidden) }) {
+            blocksPage != null -> {
+                val current = com.foco.launcher.registry.PageBlocks.effective(blocksPage)
+                LazyColumn(modifier = Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 12.dp)) {
+                    items(current.size, key = { current[it].id }) { index ->
+                        val block = current[index]
+                        Text(
+                            text = blockLabel(block.type),
+                            modifier = Modifier.padding(top = 12.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = FocoPaper,
+                        )
+                        if (block.type == com.foco.launcher.registry.PageBlocks.NOTA) {
                             Text(
-                                stringResource(
-                                    if (page.hidden) R.string.home_edit_show else R.string.home_edit_hide,
-                                ),
+                                text = block.note.ifBlank { stringResource(R.string.block_note_hint) },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = FocoPaperDim,
                             )
                         }
-                    }
-                    if (HomePages.canDelete(pages, page.id)) {
-                        FocoTextButton(onClick = { onDelete(page.id) }) {
-                            Text(stringResource(R.string.home_edit_delete))
+                        if (block.type == com.foco.launcher.registry.PageBlocks.FAVORITOS) {
+                            apps.forEach { app ->
+                                val on = app.packageName in block.pins
+                                Text(
+                                    text = (if (on) "● " else "○ ") + app.label,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            val pins = if (on) block.pins.filterNot { it == app.packageName }
+                                            else (block.pins + app.packageName).distinct().take(8)
+                                            onUpdateBlock(blocksPage.id, block.copy(pins = pins))
+                                        }
+                                        .padding(vertical = 6.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = FocoPaper,
+                                )
+                            }
+                        }
+                        Row {
+                            if (index > 0) {
+                                FocoTextButton(onClick = { onMoveBlock(blocksPage.id, block.id, -1) }) {
+                                    Text(stringResource(R.string.home_edit_up))
+                                }
+                            }
+                            if (index < current.lastIndex) {
+                                FocoTextButton(onClick = { onMoveBlock(blocksPage.id, block.id, 1) }) {
+                                    Text(stringResource(R.string.home_edit_down))
+                                }
+                            }
+                            FocoTextButton(onClick = { onRemoveBlock(blocksPage.id, block.id) }) {
+                                Text(stringResource(R.string.home_edit_delete))
+                            }
                         }
                     }
                 }
-            }
-            if (!picking && pages.size < HomePages.MAX) {
-                FocoTextButton(onClick = { picking = true }) {
-                    Text(stringResource(R.string.home_edit_add))
+                FocoTextButton(onClick = { mode = "catalog" }) {
+                    Text(stringResource(R.string.home_blocks_add))
                 }
             }
-            if (picking) {
-                HomePageTypePicker(
-                    onPick = { type, label ->
-                        picking = false
-                        onCreate(type, label)
-                    },
-                )
+            mode == "types" -> {
+                LazyColumn(modifier = Modifier.weight(1f)) {
+                    item {
+                        HomePageTypePicker(
+                            onPick = { type, _ ->
+                                mode = "pages"
+                                onCreate(type, "")
+                            },
+                        )
+                    }
+                }
+            }
+            else -> {
+                val visibleCount = pages.count { !it.hidden }
+                LazyColumn(modifier = Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 12.dp)) {
+                    items(pages.size, key = { pages[it].id }) { index ->
+                        val page = pages[index]
+                        Text(
+                            text = pageLabel(page),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { renameId = page.id }
+                                .padding(top = 14.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (page.hidden) FocoPaperDim else FocoPaper,
+                        )
+                        Row {
+                            if (index > 0) {
+                                FocoTextButton(onClick = { onMove(page.id, -1) }) {
+                                    Text(stringResource(R.string.home_edit_up))
+                                }
+                            }
+                            if (index < pages.lastIndex) {
+                                FocoTextButton(onClick = { onMove(page.id, 1) }) {
+                                    Text(stringResource(R.string.home_edit_down))
+                                }
+                            }
+                            if (page.hidden || visibleCount > 1) {
+                                FocoTextButton(onClick = { onHide(page.id, !page.hidden) }) {
+                                    Text(stringResource(if (page.hidden) R.string.home_edit_show else R.string.home_edit_hide))
+                                }
+                            }
+                            if (HomePages.canDelete(pages, page.id)) {
+                                FocoTextButton(onClick = { onDelete(page.id) }) {
+                                    Text(stringResource(R.string.home_edit_delete))
+                                }
+                            }
+                            FocoTextButton(onClick = {
+                                blocksPageId = page.id
+                                mode = "blocks"
+                            }) {
+                                Text(stringResource(R.string.home_edit_blocks))
+                            }
+                        }
+                    }
+                }
+                if (pages.size < HomePages.MAX) {
+                    FocoTextButton(onClick = { mode = "types" }) {
+                        Text(stringResource(R.string.home_edit_add))
+                    }
+                }
             }
         }
     }
@@ -863,6 +1044,7 @@ private fun HomeEditSheet(
         )
     }
 }
+
 
 @Composable
 private fun HomePageTypePicker(onPick: (String, String) -> Unit) {
@@ -935,62 +1117,74 @@ private fun HomePageNameDialog(
 
 @Composable
 private fun ClockHomePage(
+    blocks: List<com.foco.launcher.registry.PageBlock>,
+    state: HomeUiState,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
     onOpenSystemSettings: () -> Unit,
+    onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
+    onLaunch: (String) -> Unit,
+    onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
 ) {
-    val context = LocalContext.current
-    val vetus = remember(context) {
-        Santoral1962.peek() ?: runCatching {
-            context.assets.open("santoral_1962.json").bufferedReader().use { reader ->
-                Santoral1962.parse(reader.readText())
-            }
-        }.getOrNull()?.also { Santoral1962.store(it) }
-    }
-    val novus = remember(context) {
-        SantoralNovus.peek() ?: runCatching {
-            context.assets.open("santoral_novus.json").bufferedReader().use { reader ->
-                SantoralNovus.parse(reader.readText())
-            }
-        }.getOrNull()?.also { SantoralNovus.store(it) }
-    }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Spacer(Modifier.height(FocoSpace.gapLg))
-        HomeClock(
+    BlockPage(
+        blocks = blocks,
+        state = state,
+        onOpenClock = onOpenClock,
+        onOpenCalendar = onOpenCalendar,
+        onOpenSystemSettings = onOpenSystemSettings,
+        onNotificationsPaused = onNotificationsPaused,
+        onPhonePaused = onPhonePaused,
+        onLaunch = onLaunch,
+        onUpdateBlock = onUpdateBlock,
+    )
+}
+
+@Composable
+private fun BlockPage(
+    blocks: List<com.foco.launcher.registry.PageBlock>,
+    state: HomeUiState,
+    onOpenClock: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenSystemSettings: () -> Unit,
+    onNotificationsPaused: (Boolean) -> Unit,
+    onPhonePaused: (Boolean) -> Unit,
+    onLaunch: (String) -> Unit,
+    onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
+    scroll: Boolean = true,
+) {
+    if (!scroll && blocks.isEmpty()) return
+    val body: @Composable () -> Unit = {
+        PageBlockColumn(
+            blocks = blocks,
+            apps = state.apps,
+            workApps = state.workApps,
+            hasWorkProfile = state.hasWorkProfile,
+            notificationsPaused = state.notificationsPaused,
+            phonePaused = state.phonePaused,
             onOpenClock = onOpenClock,
             onOpenCalendar = onOpenCalendar,
-            modifier = Modifier.padding(horizontal = FocoSpace.page),
-            zone = HomeClockFormat.CIVIL_ZONE,
-            readGlance = { HomeGlance.line(context, HomeClockFormat.CIVIL_ZONE) },
-            underDate = { date ->
-                val traditional = vetus?.let { Santoral1962.resolve(it, date) }
-                if (traditional != null) {
-                    SantoralLine(
-                        day = traditional,
-                        label = stringResource(R.string.santoral_vetus),
-                    )
-                }
-                val roman = novus?.let { SantoralNovus.resolve(it, date) }
-                if (roman != null) {
-                    SantoralLine(
-                        day = roman,
-                        label = stringResource(R.string.santoral_novus),
-                        novus = true,
-                    )
-                }
-            },
+            onNotificationsPaused = onNotificationsPaused,
+            onPhonePaused = onPhonePaused,
+            onLaunch = onLaunch,
+            onUpdateBlock = onUpdateBlock,
+            showEmpty = scroll,
         )
-        Box(
-            modifier = Modifier
+        Spacer(
+            Modifier
                 .fillMaxWidth()
-                .height(120.dp)
+                .height(72.dp)
                 .homeLongPress(onOpenSystemSettings),
         )
+    }
+    if (scroll) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) { body() }
+    } else {
+        body()
     }
 }
 
@@ -1018,8 +1212,10 @@ private fun PersonalHomePage(
     onDragStart: (HomeCell, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
+    header: @Composable () -> Unit = {},
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item(key = "$pageKey:blocks") { header() }
         if (showBanners) {
             item(key = "$pageKey:banner") {
                 when (state.banner) {
@@ -1149,9 +1345,11 @@ private fun WorkHomePage(
     onDragStart: (HomeCell, Offset) -> Unit,
     onDrag: (Offset) -> Unit,
     onDragEnd: () -> Unit,
+    header: @Composable () -> Unit = {},
 ) {
     val focoPaused = state.workSectionPaused && state.hasWorkProfile
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item(key = "$pageKey:blocks") { header() }
         item(key = "$pageKey:work-header") {
             Spacer(Modifier.height(FocoSpace.gap))
             SectionTitle(
