@@ -131,6 +131,7 @@ class LaunchpadGuardTest {
         assertTrue(src.contains("scrollToPage"))
         assertTrue(src.contains("drawsPageTitle"))
         assertTrue(src.contains("showChromePill = visible.size < 2"))
+        assertTrue(src.contains("beyondViewportPageCount = 1"))
         val activity = File("src/main/java/com/foco/launcher/core/LauncherActivity.kt").readText()
         assertTrue(activity.contains("homeToken++"))
         val silence = File("src/main/java/com/foco/launcher/notification/Silence.kt").readText()

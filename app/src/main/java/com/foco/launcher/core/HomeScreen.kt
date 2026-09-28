@@ -5,6 +5,8 @@ package com.foco.launcher.core
 import android.graphics.Bitmap
 import android.os.SystemClock
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -374,6 +377,13 @@ fun HomeScreen(
             val pagerState = rememberPagerState(
                 initialPage = landing.coerceIn(0, (visible.size - 1).coerceAtLeast(0)),
             ) { visible.size.coerceAtLeast(1) }
+            val pagerFling = PagerDefaults.flingBehavior(
+                state = pagerState,
+                snapAnimationSpec = spring(
+                    stiffness = Spring.StiffnessMedium,
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                ),
+            )
             LaunchedEffect(visible.size) {
                 val last = (visible.size - 1).coerceAtLeast(0)
                 if (pagerState.currentPage > last) pagerState.scrollToPage(last)
@@ -424,6 +434,8 @@ fun HomeScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
+                beyondViewportPageCount = 1,
+                flingBehavior = pagerFling,
                 userScrollEnabled = drag.chrome == null,
                 verticalAlignment = Alignment.Top,
                 key = { index -> visible.getOrNull(index)?.id ?: index },
