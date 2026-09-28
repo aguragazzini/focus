@@ -1,6 +1,7 @@
 package com.foco.launcher.core
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -95,17 +97,23 @@ fun PageBlockColumn(
     val novus = remember(context) { loadNovus(context) }
     val meals = remember(context) { loadMeals(context) }
     val phrases = remember(context) { loadPhrases(context) }
-    Column(modifier = modifier.fillMaxWidth()) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
         if (blocks.isEmpty() && showEmpty) {
             Text(
                 text = stringResource(R.string.home_blocks_empty),
-                modifier = Modifier.padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page, vertical = FocoSpace.gap),
                 style = MaterialTheme.typography.bodyLarge,
                 color = FocoPaperDim,
+                textAlign = TextAlign.Center,
             )
         }
         blocks.forEach { block ->
-            BlockFrame(label = blockLabel(block.type)) {
+            BlockFrame(label = frameLabel(block.type)) {
                 BlockBody(
                     block = block,
                     now = now,
@@ -134,18 +142,33 @@ fun PageBlockColumn(
     }
 }
 
+/**
+ * One centered caption. Reloj skips it: the page name is already Reloj and the digits are the block.
+ * Vetus and Novus use this caption and hide the title inside [SantoralLine].
+ */
 @Composable
-private fun BlockFrame(label: String, body: @Composable () -> Unit) {
+private fun frameLabel(type: String): String? {
+    if (type == PageBlocks.RELOJ || type == PageBlocks.VACIO) return null
+    return blockLabel(type)
+}
+
+@Composable
+private fun BlockFrame(label: String?, body: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = FocoSpace.page, vertical = FocoSpace.hair),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        if (!label.isNullOrBlank()) {
+            Text(
+                text = label,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
         body()
     }
 }
@@ -196,7 +219,11 @@ private fun BlockBody(
         PageBlocks.VETUS -> {
             val line = vetus?.let { Santoral1962.resolve(it, day) }
             if (line != null) {
-                SantoralLine(day = line, label = stringResource(R.string.santoral_vetus))
+                SantoralLine(
+                    day = line,
+                    label = stringResource(R.string.santoral_vetus),
+                    showLabel = false,
+                )
             } else {
                 BodyText(stringResource(R.string.block_unavailable))
             }
@@ -204,7 +231,12 @@ private fun BlockBody(
         PageBlocks.NOVUS -> {
             val line = novus?.let { SantoralNovus.resolve(it, day) }
             if (line != null) {
-                SantoralLine(day = line, label = stringResource(R.string.santoral_novus), novus = true)
+                SantoralLine(
+                    day = line,
+                    label = stringResource(R.string.santoral_novus),
+                    novus = true,
+                    showLabel = false,
+                )
             } else {
                 BodyText(stringResource(R.string.block_unavailable))
             }
@@ -253,8 +285,17 @@ private fun BlockBody(
             value = block.note,
             onValueChange = { raw -> onUpdateBlock(block.copy(note = raw.take(PageBlocks.NOTE_MAX))) },
             modifier = Modifier.fillMaxWidth(),
-            textStyle = MaterialTheme.typography.bodyLarge.copy(color = FocoPaper),
-            placeholder = { Text(stringResource(R.string.block_note_hint)) },
+            textStyle = MaterialTheme.typography.bodyLarge.copy(
+                color = FocoPaper,
+                textAlign = TextAlign.Center,
+            ),
+            placeholder = {
+                Text(
+                    text = stringResource(R.string.block_note_hint),
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                )
+            },
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedTextColor = FocoPaper,
@@ -266,7 +307,11 @@ private fun BlockBody(
                 unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
             ),
         )
-        PageBlocks.CONTADOR -> Row(verticalAlignment = Alignment.CenterVertically) {
+        PageBlocks.CONTADOR -> Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             FocoTextButton(onClick = { onUpdateBlock(block.copy(count = (block.count - 1).coerceAtLeast(0))) }) {
                 Text("−")
             }
@@ -310,8 +355,10 @@ private fun BlockBody(
 private fun BodyText(text: String) {
     Text(
         text = text,
+        modifier = Modifier.fillMaxWidth(),
         style = MaterialTheme.typography.bodyLarge,
         color = FocoPaper,
+        textAlign = TextAlign.Center,
     )
 }
 
@@ -333,8 +380,10 @@ private fun AgendaLines(snapshot: AgendaSnapshot?, limit: Int) {
     events.take(limit).forEach { event ->
         Text(
             text = event.title.ifBlank { stringResource(R.string.agenda_untitled) },
+            modifier = Modifier.fillMaxWidth(),
             style = MaterialTheme.typography.bodyLarge,
             color = FocoPaper,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -356,6 +405,7 @@ private fun AppNames(apps: List<LaunchableApp>, onLaunch: (String) -> Unit) {
                 .padding(vertical = 4.dp),
             style = MaterialTheme.typography.bodyLarge,
             color = FocoPaper,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -374,6 +424,7 @@ private fun AppNames(labels: List<String>, onClick: (() -> Unit)?) {
                 .padding(vertical = 4.dp),
             style = MaterialTheme.typography.bodyLarge,
             color = FocoPaper,
+            textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )

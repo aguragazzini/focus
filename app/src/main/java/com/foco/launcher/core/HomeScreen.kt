@@ -1823,12 +1823,13 @@ private fun PersonalEmptyInline(onAddApps: () -> Unit, onOpenSystemSettings: () 
 private fun SectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
         style = MaterialTheme.typography.bodyMedium.copy(
             fontWeight = FontWeight.Medium,
             letterSpacing = 0.04.em,
         ),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        textAlign = TextAlign.Center,
     )
 }
 

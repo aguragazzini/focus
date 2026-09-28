@@ -32,6 +32,7 @@ fun SantoralLine(
     label: String,
     modifier: Modifier = Modifier,
     novus: Boolean = false,
+    showLabel: Boolean = true,
 ) {
     var open by rememberSaveable { mutableStateOf(false) }
     val detail = santoralDetail(day, novus)
@@ -52,19 +53,21 @@ fun SantoralLine(
             .padding(horizontal = FocoSpace.gapLg, vertical = FocoSpace.hair),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(
-            text = label,
-            style = TextStyle(
-                fontFamily = FontFamily.SansSerif,
-                fontWeight = FontWeight.Normal,
-                fontSize = 11.sp,
-                lineHeight = 14.sp,
-                color = FocoPaperDim,
-                letterSpacing = 0.6.sp,
-            ),
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(FocoSpace.hair))
+        if (showLabel && label.isNotBlank()) {
+            Text(
+                text = label,
+                style = TextStyle(
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Normal,
+                    fontSize = 11.sp,
+                    lineHeight = 14.sp,
+                    color = FocoPaperDim,
+                    letterSpacing = 0.6.sp,
+                ),
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(FocoSpace.hair))
+        }
         Text(
             text = day.name,
             style = TextStyle(
