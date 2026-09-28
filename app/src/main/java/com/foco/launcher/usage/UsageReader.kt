@@ -1,5 +1,6 @@
 package com.foco.launcher.usage
 
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -10,9 +11,13 @@ data class UsageSnapshot(
     val granted: Boolean,
     val apps: List<UsageApp>,
     /** Seven local days, oldest first. Empty when the daily buckets were not read. */
-    val days: List<Long> = emptyList(),
+    val days: List<UsageDay> = emptyList(),
     /** A read failed after the grant. This is not zero usage. */
     val failed: Boolean = false,
+    /** When this snapshot was read. Relative "hace…" lines use this, not a ticker. */
+    val readAtMillis: Long = 0L,
+    /** Screen interactive time for local today. Null when the OEM returned nothing. */
+    val screenOnTodayMs: Long? = null,
 )
 
 /**
@@ -51,6 +56,8 @@ object UsageReader {
                 launchable = { pkg -> pm.getLaunchIntentForPackage(pkg) != null },
             ),
             days = UsageReport.dayTotals(spans, nowMillis, zone),
+            readAtMillis = nowMillis,
+            screenOnTodayMs = screenOnToday(manager, todayStart, nowMillis),
         )
     }
 
@@ -63,11 +70,11 @@ object UsageReader {
         return try {
             if (UsageReport.aggregate(Build.VERSION.SDK_INT)) {
                 manager.queryAndAggregateUsageStats(start, end).orEmpty().map { (_, stat) ->
-                    sample(stat.packageName, stat.totalTimeInForeground)
+                    sample(stat.packageName, stat.totalTimeInForeground, stat.lastTimeUsed)
                 }
             } else {
                 manager.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, start, end).orEmpty().map { stat ->
-                    sample(stat.packageName, stat.totalTimeInForeground)
+                    sample(stat.packageName, stat.totalTimeInForeground, stat.lastTimeUsed)
                 }
             }
         } catch (_: SecurityException) {
@@ -90,10 +97,30 @@ object UsageReader {
         }
     }
 
-    private fun sample(packageName: String?, foregroundMs: Long): UsageSample {
+    /**
+     * Screen-on for local today. Empty or unavailable stays null.
+     * This is not a session timeline.
+     */
+    private fun screenOnToday(manager: UsageStatsManager, start: Long, end: Long): Long? {
+        if (Build.VERSION.SDK_INT < 28 || end <= start) return null
+        return try {
+            val rows = manager.queryEventStats(UsageStatsManager.INTERVAL_DAILY, start, end).orEmpty()
+            UsageReport.screenInteractiveMs(
+                rows.map { it.eventType to it.totalTime },
+                UsageEvents.Event.SCREEN_INTERACTIVE,
+            )
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun sample(packageName: String?, foregroundMs: Long, lastUsedMillis: Long): UsageSample {
         return UsageSample(
             packageName = packageName.orEmpty(),
             foregroundMs = foregroundMs.coerceAtLeast(0L),
+            lastUsedMillis = lastUsedMillis.coerceAtLeast(0L),
         )
     }
 

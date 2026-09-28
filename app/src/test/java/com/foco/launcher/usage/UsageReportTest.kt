@@ -85,6 +85,8 @@ class UsageReportTest {
         assertTrue(reader.contains("queryAndAggregateUsageStats"))
         assertTrue(reader.contains("queryUsageStats"))
         assertFalse(reader.contains("queryEvents"))
+        assertTrue(reader.contains("queryEventStats"))
+        assertTrue(reader.contains("lastTimeUsed"))
         assertFalse(reader.contains("createContextAsUser"))
         val page = File("src/main/java/com/foco/launcher/core/UsagePage.kt").readText()
         assertFalse(page.contains("while (true)"))
@@ -118,9 +120,54 @@ class UsageReportTest {
             zone = zone,
         )
         assertEquals(7, days.size)
-        assertEquals(90_000L, days.first())
-        assertEquals(0L, days[1])
-        assertEquals(120_000L, days.last())
+        assertEquals(90_000L, days.first().foregroundMs)
+        assertEquals(first, days.first().startMillis)
+        assertEquals(0L, days[1].foregroundMs)
+        assertEquals(120_000L, days.last().foregroundMs)
+        assertEquals("mar", UsageFormat.weekday(days.first().startMillis, zone))
+        assertEquals("lun", UsageFormat.weekday(days.last().startMillis, zone))
+    }
+
+    @Test
+    fun leakCountsTimeOutsidePersonalAndSkipsTheWhitelist() {
+        val apps = listOf(
+            UsageApp("com.chrome", "Chrome", todayMs = 3_600_000L, weekMs = 3_600_000L, launchable = true),
+            UsageApp("com.maps", "Maps", todayMs = 0L, weekMs = 120_000L, launchable = true),
+            UsageApp("com.foco", "Foco", todayMs = 60_000L, weekMs = 60_000L, launchable = true),
+        )
+        val personal = setOf("com.foco")
+        val today = UsageReport.leak(apps, byToday = true, personal = personal)
+        assertEquals(1, today?.count)
+        assertEquals(3_600_000L, today?.ms)
+        val week = UsageReport.leak(apps, byToday = false, personal = personal)
+        assertEquals(2, week?.count)
+        assertEquals(3_720_000L, week?.ms)
+        assertEquals(null, UsageReport.leak(apps, byToday = true, personal = setOf("com.chrome", "com.foco")))
+    }
+
+    @Test
+    fun screenInteractiveIgnoresOtherEventsAndAnEmptyRead() {
+        val interactive = 15
+        assertEquals(null, UsageReport.screenInteractiveMs(emptyList(), interactive))
+        assertEquals(
+            null,
+            UsageReport.screenInteractiveMs(listOf(1 to 50_000L, interactive to 0L), interactive),
+        )
+        assertEquals(
+            4_000L,
+            UsageReport.screenInteractiveMs(listOf(1 to 9_000L, interactive to 1_000L, interactive to 3_000L), interactive),
+        )
+    }
+
+    @Test
+    fun lastUsedIsRelativeAndOmitsAMissingStamp() {
+        val zone = ZoneId.of("America/Argentina/Cordoba")
+        val now = java.time.ZonedDateTime.of(2026, 9, 28, 18, 40, 0, 0, zone).toInstant().toEpochMilli()
+        assertEquals(null, UsageFormat.lastUsed(0L, now, zone))
+        assertEquals(null, UsageFormat.lastUsed(now + 5_000L, now, zone))
+        assertEquals("hace 12 min", UsageFormat.lastUsed(now - 12 * 60_000L, now, zone))
+        val yesterday = java.time.ZonedDateTime.of(2026, 9, 27, 18, 40, 0, 0, zone).toInstant().toEpochMilli()
+        assertEquals("ayer 18:40", UsageFormat.lastUsed(yesterday, now, zone))
     }
 
     @Test

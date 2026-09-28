@@ -620,6 +620,7 @@ fun HomeScreen(
                                 onOpenSystemSettings = onOpenSystemSettings,
                                 active = pagerState.settledPage == page,
                                 namesOnly = state.namesOnly,
+                                personal = state.apps.map { it.packageName }.toSet(),
                             )
                         }
                     }

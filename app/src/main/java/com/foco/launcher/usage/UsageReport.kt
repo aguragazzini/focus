@@ -1,5 +1,6 @@
 package com.foco.launcher.usage
 
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -8,6 +9,7 @@ import java.time.ZoneId
 data class UsageSample(
     val packageName: String,
     val foregroundMs: Long,
+    val lastUsedMillis: Long = 0L,
 )
 
 data class UsageApp(
@@ -16,6 +18,19 @@ data class UsageApp(
     val todayMs: Long,
     val weekMs: Long,
     val launchable: Boolean,
+    val lastUsedMillis: Long = 0L,
+)
+
+/** One local day in the seven-day bar. */
+data class UsageDay(
+    val startMillis: Long,
+    val foregroundMs: Long,
+)
+
+/** Foreground time on apps that are not in the Personal whitelist. */
+data class UsageLeak(
+    val count: Int,
+    val ms: Long,
 )
 
 /** One daily bucket. [beginMillis] is the bucket start, not a guessed session. */
@@ -49,6 +64,8 @@ object UsageReport {
     ): List<UsageApp> {
         val todayMs = sum(today)
         val weekMs = sum(week)
+        val todayLast = latest(today)
+        val weekLast = latest(week)
         val packages = todayMs.keys + weekMs.keys
         return packages.mapNotNull { pkg ->
             val label = labelOf(pkg)?.trim().orEmpty()
@@ -62,8 +79,34 @@ object UsageReport {
                 todayMs = day,
                 weekMs = span,
                 launchable = launchable(pkg),
+                lastUsedMillis = maxOf(todayLast[pkg] ?: 0L, weekLast[pkg] ?: 0L),
             )
         }.sortedWith(compareByDescending<UsageApp> { it.weekMs }.thenBy { it.label })
+    }
+
+    /**
+     * Apps with time in the selected span that are absent from [personal].
+     * An empty whitelist still counts: those apps are outside Personal.
+     */
+    fun leak(apps: List<UsageApp>, byToday: Boolean, personal: Set<String>): UsageLeak? {
+        val outside = apps.filter { ms(it, byToday) > 0L && it.packageName !in personal }
+        if (outside.isEmpty()) return null
+        return UsageLeak(
+            count = outside.size,
+            ms = outside.sumOf { ms(it, byToday) },
+        )
+    }
+
+    /** Sum of SCREEN_INTERACTIVE totals. No matching time means there is nothing to show. */
+    fun screenInteractiveMs(events: List<Pair<Int, Long>>, interactiveType: Int): Long? {
+        var sum = 0L
+        var seen = false
+        for ((type, ms) in events) {
+            if (type != interactiveType) continue
+            seen = true
+            if (ms > 0L) sum += ms
+        }
+        return if (!seen || sum <= 0L) null else sum
     }
 
     /** Top apps for the selected span. Zero in that span is omitted. */
@@ -87,7 +130,7 @@ object UsageReport {
      * Seven local days, oldest first, ending today. A day with no bucket is 0.
      * Days outside that window are dropped, not moved.
      */
-    fun dayTotals(spans: List<UsageSpan>, nowMillis: Long, zone: ZoneId): List<Long> {
+    fun dayTotals(spans: List<UsageSpan>, nowMillis: Long, zone: ZoneId): List<UsageDay> {
         val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
         val days = (6 downTo 0).map { today.minusDays(it.toLong()) }
         val sums = HashMap<LocalDate, Long>()
@@ -97,7 +140,9 @@ object UsageReport {
             if (day !in days) continue
             sums[day] = (sums[day] ?: 0L) + span.foregroundMs
         }
-        return days.map { sums[it] ?: 0L }
+        return days.map { day ->
+            UsageDay(startMillis = startOf(day, zone), foregroundMs = sums[day] ?: 0L)
+        }
     }
 
     private fun sum(samples: List<UsageSample>): Map<String, Long> {
@@ -106,6 +151,16 @@ object UsageReport {
             val pkg = sample.packageName.trim()
             if (pkg.isEmpty() || sample.foregroundMs <= 0L) continue
             out[pkg] = (out[pkg] ?: 0L) + sample.foregroundMs
+        }
+        return out
+    }
+
+    private fun latest(samples: List<UsageSample>): Map<String, Long> {
+        val out = HashMap<String, Long>()
+        for (sample in samples) {
+            val pkg = sample.packageName.trim()
+            if (pkg.isEmpty() || sample.lastUsedMillis <= 0L) continue
+            out[pkg] = maxOf(out[pkg] ?: 0L, sample.lastUsedMillis)
         }
         return out
     }
@@ -128,5 +183,42 @@ object UsageFormat {
             hours > 0L -> "$hours h"
             else -> "$minutes min"
         }
+    }
+
+    /** Relative local time. A missing or future stamp is omitted. */
+    fun lastUsed(lastMillis: Long, nowMillis: Long, zone: ZoneId): String? {
+        if (lastMillis <= 0L || nowMillis < lastMillis) return null
+        val lastDate = Instant.ofEpochMilli(lastMillis).atZone(zone).toLocalDate()
+        val today = Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate()
+        val delta = nowMillis - lastMillis
+        if (lastDate == today) {
+            if (delta < 60_000L) return "hace < 1 min"
+            val minutes = delta / 60_000L
+            if (minutes < 60L) return "hace $minutes min"
+            val hours = minutes / 60L
+            val rest = minutes % 60L
+            return if (rest == 0L) "hace $hours h" else "hace $hours h $rest min"
+        }
+        val clock = clock(lastMillis, zone)
+        if (lastDate == today.minusDays(1)) return "ayer $clock"
+        return "${weekday(lastMillis, zone)} $clock"
+    }
+
+    fun weekday(startMillis: Long, zone: ZoneId): String {
+        val day = Instant.ofEpochMilli(startMillis).atZone(zone).dayOfWeek
+        return when (day) {
+            DayOfWeek.MONDAY -> "lun"
+            DayOfWeek.TUESDAY -> "mar"
+            DayOfWeek.WEDNESDAY -> "mié"
+            DayOfWeek.THURSDAY -> "jue"
+            DayOfWeek.FRIDAY -> "vie"
+            DayOfWeek.SATURDAY -> "sáb"
+            DayOfWeek.SUNDAY -> "dom"
+        }
+    }
+
+    private fun clock(epochMillis: Long, zone: ZoneId): String {
+        val local = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalTime()
+        return "%02d:%02d".format(local.hour, local.minute)
     }
 }

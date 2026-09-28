@@ -59,6 +59,7 @@ import com.foco.launcher.R
 import com.foco.launcher.usage.UsageAccess
 import com.foco.launcher.usage.UsageApp
 import com.foco.launcher.usage.UsageFormat
+import com.foco.launcher.usage.UsageDay
 import com.foco.launcher.usage.UsageReader
 import com.foco.launcher.usage.UsageReport
 import com.foco.launcher.usage.UsageSnapshot
@@ -77,6 +78,7 @@ fun UsageHomePage(
     zone: ZoneId = HomeClockFormat.CIVIL_ZONE,
     active: Boolean = true,
     namesOnly: Boolean = false,
+    personal: Set<String> = emptySet(),
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -153,18 +155,31 @@ fun UsageHomePage(
             val total = UsageReport.totalMs(loaded.apps, byToday)
             val weekTotal = UsageReport.totalMs(loaded.apps, byToday = false)
             val peak = rows.maxOfOrNull { if (byToday) it.todayMs else it.weekMs } ?: 0L
+            val leak = UsageReport.leak(loaded.apps, byToday, personal)
+            val screenMs = loaded.screenOnTodayMs
             item(key = "uso-total") {
                 UsageTotal(
                     totalLabel = UsageFormat.duration(total),
                     subtitle = stringResource(
                         if (byToday) R.string.uso_chip_today else R.string.uso_week_label,
                     ),
+                    screenLine = if (byToday && screenMs != null) {
+                        stringResource(R.string.uso_screen, UsageFormat.duration(screenMs))
+                    } else {
+                        null
+                    },
                     weekLine = if (byToday) {
                         stringResource(R.string.uso_week_label) + " · " + UsageFormat.duration(weekTotal)
                     } else {
                         null
                     },
+                    leakLine = if (leak == null) {
+                        null
+                    } else {
+                        stringResource(R.string.uso_leak, leak.count, UsageFormat.duration(leak.ms))
+                    },
                     days = loaded.days,
+                    zone = zone,
                     byToday = byToday,
                     onToday = { byToday = true },
                     onWeek = { byToday = false },
@@ -192,6 +207,9 @@ fun UsageHomePage(
                         ms = if (byToday) app.todayMs else app.weekMs,
                         peak = peak,
                         namesOnly = namesOnly,
+                        outside = app.packageName !in personal,
+                        readAtMillis = loaded.readAtMillis,
+                        zone = zone,
                         onLaunch = onLaunch,
                     )
                 }
@@ -274,8 +292,11 @@ private fun UsagePermission(
 private fun UsageTotal(
     totalLabel: String,
     subtitle: String,
+    screenLine: String?,
     weekLine: String?,
-    days: List<Long>,
+    leakLine: String?,
+    days: List<UsageDay>,
+    zone: ZoneId,
     byToday: Boolean,
     onToday: () -> Unit,
     onWeek: () -> Unit,
@@ -300,6 +321,18 @@ private fun UsageTotal(
             color = FocoPaperDim,
             textAlign = TextAlign.Center,
         )
+        if (screenLine != null) {
+            Spacer(Modifier.height(FocoSpace.hair))
+            Text(
+                text = screenLine,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page),
+                style = MaterialTheme.typography.bodyLarge,
+                color = FocoPaper,
+                textAlign = TextAlign.Center,
+            )
+        }
         if (weekLine != null) {
             Spacer(Modifier.height(FocoSpace.gapLg))
             Text(
@@ -312,9 +345,9 @@ private fun UsageTotal(
                 textAlign = TextAlign.Center,
             )
         }
-        if (days.any { it > 0L }) {
+        if (days.any { it.foregroundMs > 0L }) {
             Spacer(Modifier.height(FocoSpace.gap))
-            DayBars(days)
+            DayBars(days, zone)
         }
         Spacer(Modifier.height(FocoSpace.gapLg))
         Row(
@@ -329,6 +362,17 @@ private fun UsageTotal(
         FocoTextButton(onClick = onRefresh) {
             Text(stringResource(R.string.uso_refresh))
         }
+        if (leakLine != null) {
+            Text(
+                text = leakLine,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page),
+                style = MaterialTheme.typography.bodyMedium,
+                color = FocoPaperDim,
+                textAlign = TextAlign.Center,
+            )
+        }
         Text(
             text = stringResource(R.string.uso_more),
             modifier = Modifier.fillMaxWidth(),
@@ -341,30 +385,40 @@ private fun UsageTotal(
 }
 
 @Composable
-private fun DayBars(days: List<Long>) {
-    val max = days.maxOrNull()?.coerceAtLeast(1L) ?: return
+private fun DayBars(days: List<UsageDay>, zone: ZoneId) {
+    val max = days.maxOf { it.foregroundMs }.coerceAtLeast(1L)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = FocoSpace.page)
-            .height(28.dp),
+            .padding(horizontal = FocoSpace.page),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.Bottom,
     ) {
-        days.forEach { ms ->
-            val fraction = (ms.toFloat() / max.toFloat()).coerceIn(0f, 1f)
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .background(FocoLine),
+        days.forEach { day ->
+            val fraction = (day.foregroundMs.toFloat() / max.toFloat()).coerceIn(0f, 1f)
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .fillMaxHeight(fraction)
-                        .background(FocoPaper.copy(alpha = 0.20f)),
+                        .height(28.dp)
+                        .background(FocoLine),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .fillMaxHeight(fraction)
+                            .background(FocoPaper.copy(alpha = 0.20f)),
+                    )
+                }
+                Text(
+                    text = UsageFormat.weekday(day.startMillis, zone),
+                    color = FocoPaperDim,
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 10.sp, lineHeight = 12.sp),
                 )
             }
         }
@@ -395,6 +449,9 @@ private fun UsageRow(
     ms: Long,
     peak: Long,
     namesOnly: Boolean,
+    outside: Boolean,
+    readAtMillis: Long,
+    zone: ZoneId,
     onLaunch: (String) -> Unit,
 ) {
     val open = if (app.launchable) {
@@ -405,6 +462,12 @@ private fun UsageRow(
         Modifier
     }
     val fraction = if (peak > 0L) (ms.toFloat() / peak.toFloat()).coerceIn(0f, 1f) else 0f
+    val used = UsageFormat.lastUsed(app.lastUsedMillis, readAtMillis, zone)
+    val fuera = stringResource(R.string.uso_fuera)
+    val note = buildList {
+        if (outside) add(fuera)
+        if (used != null) add(used)
+    }.joinToString(" · ")
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -429,6 +492,15 @@ private fun UsageRow(
                     style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 22.sp),
                     color = FocoPaperDim,
                     maxLines = 1,
+                )
+            }
+            if (note.isNotEmpty()) {
+                Text(
+                    text = note,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = FocoPaperDim,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
             Box(
