@@ -85,6 +85,16 @@ object HomePages {
         return if (personal >= 0) personal else 0
     }
 
+    /**
+     * The page already prints its name, so the pager cue must not repeat it.
+     * A blank Agenda label leaves the name on the cue.
+     */
+    fun drawsPageTitle(page: HomePageSpec): Boolean = when (page.type) {
+        TYPE_PERSONAL, TYPE_APPS, TYPE_WORK -> true
+        TYPE_AGENDA -> page.label.isNotBlank()
+        else -> false
+    }
+
     fun create(pages: List<HomePageSpec>, type: String, label: String, id: String): List<HomePageSpec> {
         val kind = type.trim().uppercase()
         val pageId = id.trim()

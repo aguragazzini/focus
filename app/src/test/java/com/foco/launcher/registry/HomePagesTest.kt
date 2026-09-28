@@ -23,6 +23,12 @@ class HomePagesTest {
         )
         assertTrue(pages.none { it.hidden })
         assertEquals(2, HomePages.landingIndex(HomePages.visible(pages)))
+        assertFalse(HomePages.drawsPageTitle(pages[0]))
+        assertFalse(HomePages.drawsPageTitle(pages[1]))
+        assertTrue(HomePages.drawsPageTitle(pages[2]))
+        assertFalse(HomePages.drawsPageTitle(pages[3]))
+        assertTrue(HomePages.drawsPageTitle(pages[4]))
+        assertTrue(HomePages.drawsPageTitle(pages[1].copy(label = "Hoy")))
     }
 
     @Test

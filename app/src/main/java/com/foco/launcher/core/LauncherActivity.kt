@@ -159,6 +159,7 @@ class LauncherActivity : ComponentActivity() {
                     onUpdateBlock = vm::updateHomeBlock,
                     onPhonePaused = vm::setPhonePaused,
                     onSilence = vm::setSilence,
+                    onArmSilence = vm::armSilenceOnConnect,
                     onPackagePaused = vm::setPackagePaused,
                     homeToken = homeToken,
                 )

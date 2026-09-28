@@ -104,6 +104,7 @@ fun SettingsHost(
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
+    onArmSilence: () -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
@@ -125,6 +126,7 @@ fun SettingsHost(
             onNotificationsPaused = onNotificationsPaused,
             onPhonePaused = onPhonePaused,
             onSilence = onSilence,
+            onArmSilence = onArmSilence,
             onNamesOnly = onNamesOnly,
             onEditHome = onEditHome,
             onRequestCalendar = onRequestCalendar,
@@ -189,6 +191,7 @@ private fun SettingsMain(
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
+    onArmSilence: () -> Unit,
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
@@ -274,14 +277,16 @@ private fun SettingsMain(
                         phonePaused = state.phonePaused,
                         listenerReady = state.nlsGranted && state.nlsConnected,
                         onChange = onSilence,
-                        onActivate = onOpenNlsSettings,
+                        onActivate = {
+                            onArmSilence()
+                            onOpenNlsSettings()
+                        },
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
                     Text(
                         text = stringResource(
                             when (silence) {
-                                SilenceLevel.TODO -> R.string.phone_pause_sub
-                                SilenceLevel.AVISOS -> R.string.nls_pause_sub
+                                SilenceLevel.FOCO -> R.string.phone_pause_sub
                                 SilenceLevel.OFF -> R.string.silence_sub
                             },
                         ),

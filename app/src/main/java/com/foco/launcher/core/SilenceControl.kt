@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Notifications
@@ -23,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -39,8 +37,8 @@ import com.foco.launcher.notification.Silence
 import com.foco.launcher.notification.SilenceLevel
 
 /**
- * One pill. The visible word stays «Foco».
- * Outline bell is off, a filled bell is in-scope, a struck bell and a Paper border cancel everything.
+ * Off says Avisos: outline bell, hairline, no cancel.
+ * On says Foco: paper fill and a filled bell, and the listener cancels everything it sees.
  */
 @Composable
 fun SilenceControl(
@@ -53,23 +51,21 @@ fun SilenceControl(
 ) {
     val level = Silence.level(notificationsPaused, phonePaused)
     val view = LocalView.current
-    val activateLabel = stringResource(R.string.silence_activate)
-    val focoLabel = stringResource(R.string.silence_foco)
-    val spoken = when {
-        !listenerReady -> activateLabel
-        level == SilenceLevel.TODO -> stringResource(R.string.silence_all)
-        level == SilenceLevel.AVISOS -> focoLabel
-        else -> stringResource(R.string.silence_off)
+    val on = listenerReady && level == SilenceLevel.FOCO
+    val visible = when {
+        !listenerReady -> stringResource(R.string.silence_activate)
+        on -> stringResource(R.string.silence_foco)
+        else -> stringResource(R.string.silence_avisos)
     }
-    val visible = if (listenerReady) focoLabel else activateLabel
-    val inScope = listenerReady && level == SilenceLevel.AVISOS
-    val cancelAll = listenerReady && level == SilenceLevel.TODO
-    val active = inScope || cancelAll
-    val textColor = if (active) FocoPaper else FocoPaperDim
+    val spoken = when {
+        !listenerReady -> stringResource(R.string.silence_activate)
+        on -> stringResource(R.string.silence_a11y_on)
+        else -> stringResource(R.string.silence_a11y_off)
+    }
     val shape = RoundedCornerShape(50)
     val act = {
         view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-        if (listenerReady) onChange(Silence.next(level)) else onActivate()
+        if (listenerReady) onChange(Silence.toggle(level)) else onActivate()
     }
     Box(
         modifier = modifier.fillMaxWidth(),
@@ -79,10 +75,10 @@ fun SilenceControl(
             modifier = Modifier
                 .height(FocoSpace.touch)
                 .clip(shape)
-                .background(if (active) FocoInkElevated else Color.Transparent)
+                .background(if (on) FocoPaper else Color.Transparent)
                 .border(
-                    width = if (cancelAll) 2.dp else 1.dp,
-                    color = if (active) FocoPaper else FocoLine,
+                    width = if (on) 2.dp else 1.dp,
+                    color = if (on) FocoPaper else FocoLine,
                     shape = shape,
                 )
                 .clickable(onClick = act)
@@ -95,26 +91,15 @@ fun SilenceControl(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = if (active) Icons.Filled.Notifications else Icons.Outlined.Notifications,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = textColor.copy(alpha = if (active) 1f else 0.55f),
-                )
-                if (cancelAll) {
-                    Box(
-                        Modifier
-                            .width(18.dp)
-                            .height(1.5.dp)
-                            .rotate(-42f)
-                            .background(FocoInk),
-                    )
-                }
-            }
+            Icon(
+                imageVector = if (on) Icons.Filled.Notifications else Icons.Outlined.Notifications,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp),
+                tint = if (on) FocoInk else FocoPaperDim.copy(alpha = 0.55f),
+            )
             Text(
                 text = visible,
-                color = textColor,
+                color = if (on) FocoInk else FocoPaperDim,
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodyLarge,
             )

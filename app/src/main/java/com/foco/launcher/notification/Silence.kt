@@ -1,32 +1,39 @@
 package com.foco.launcher.notification
 
 /**
- * One pill over the two listener flags.
+ * One pill, two states.
  *
- * Cycle: Sin pausa → Foco → Todo en pausa → Sin pausa.
- * [TODO] wins when the phone pause was already on, so opening the app does not unmute.
- * Reading a level does not write. [OFF] is the only full unmute, and only after a tap.
+ * Off leaves notifications alone. Foco cancels every notification the listener can see
+ * (the old cancel-all flag). The in-scope filter is not a pill state.
+ * Reading a level does not write. An in-scope-only store still reads as Foco so the
+ * next save turns cancel-all on. [OFF] is the only unmute, and only after a tap.
  */
 enum class SilenceLevel {
     OFF,
-    AVISOS,
-    TODO,
+    FOCO,
 }
 
 object Silence {
     fun level(notificationsPaused: Boolean, phonePaused: Boolean): SilenceLevel {
-        if (phonePaused) return SilenceLevel.TODO
-        if (notificationsPaused) return SilenceLevel.AVISOS
-        return SilenceLevel.OFF
+        return if (phonePaused || notificationsPaused) SilenceLevel.FOCO else SilenceLevel.OFF
     }
 
-    fun next(level: SilenceLevel): SilenceLevel = when (level) {
-        SilenceLevel.OFF -> SilenceLevel.AVISOS
-        SilenceLevel.AVISOS -> SilenceLevel.TODO
-        SilenceLevel.TODO -> SilenceLevel.OFF
+    fun toggle(level: SilenceLevel): SilenceLevel = when (level) {
+        SilenceLevel.OFF -> SilenceLevel.FOCO
+        SilenceLevel.FOCO -> SilenceLevel.OFF
     }
 
-    fun notificationsPaused(level: SilenceLevel): Boolean = level != SilenceLevel.OFF
+    /** Foco writes both flags. [phonePaused] is what cancels spares. */
+    fun notificationsPaused(level: SilenceLevel): Boolean = level == SilenceLevel.FOCO
 
-    fun phonePaused(level: SilenceLevel): Boolean = level == SilenceLevel.TODO
+    fun phonePaused(level: SilenceLevel): Boolean = level == SilenceLevel.FOCO
+
+    /**
+     * Stored in-scope-only pause becomes cancel-all. Off stays off.
+     * Does not turn a chosen Off into On.
+     */
+    fun align(notificationsPaused: Boolean, phonePaused: Boolean): Pair<Boolean, Boolean> {
+        val on = notificationsPaused || phonePaused
+        return on to on
+    }
 }

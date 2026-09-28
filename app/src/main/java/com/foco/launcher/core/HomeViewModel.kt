@@ -266,6 +266,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun armSilenceOnConnect() {
+        viewModelScope.launch {
+            app.prefsStore.update { it.copy(silenceArmOnConnect = true) }
+        }
+    }
+
     fun setSilence(level: com.foco.launcher.notification.SilenceLevel) {
         viewModelScope.launch {
             try {

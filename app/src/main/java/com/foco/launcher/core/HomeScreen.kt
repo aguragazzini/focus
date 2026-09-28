@@ -173,6 +173,7 @@ fun HomeScreen(
     onDeletePage: (String) -> Unit = {},
     onPhonePaused: (Boolean) -> Unit = {},
     onSilence: (SilenceLevel) -> Unit = {},
+    onArmSilence: () -> Unit = {},
     onPackagePaused: (String, Boolean) -> Unit = { _, _ -> },
     onAddBlock: (String, String) -> Unit = { _, _ -> },
     onRemoveBlock: (String, String) -> Unit = { _, _ -> },
@@ -363,6 +364,8 @@ fun HomeScreen(
                 if (pagerState.currentPage != target) pagerState.scrollToPage(target)
             }
             val pageLabels = visible.map { pageLabel(it) }
+            val cueIndex = pagerState.currentPage.coerceIn(0, (pageLabels.size - 1).coerceAtLeast(0))
+            val cueSpec = visible.getOrNull(cueIndex)
             if (editing) {
                 HomeEditor(
                     pages = state.homePages,
@@ -385,7 +388,8 @@ fun HomeScreen(
             if (!editing) {
             HomePagerCue(
                 labels = pageLabels,
-                page = pagerState.currentPage.coerceIn(0, (pageLabels.size - 1).coerceAtLeast(0)),
+                page = cueIndex,
+                showLabel = cueSpec == null || !HomePages.drawsPageTitle(cueSpec),
                 onSelect = { index -> scope.launch { pagerState.animateScrollToPage(index) } },
                 onEdit = {
                     sheet = null
@@ -415,6 +419,7 @@ fun HomeScreen(
                         onSilence = onSilence,
                         onLaunch = onLaunch,
                         onOpenAvisos = onOpenAvisos,
+                        onArmSilence = onArmSilence,
                         onUpdateBlock = { onUpdateBlock(spec.id, it) },
                     )
                     HomePages.TYPE_AGENDA -> {
@@ -441,6 +446,7 @@ fun HomeScreen(
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onOpenAvisos = onOpenAvisos,
+                                onArmSilence = onArmSilence,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                             )
                         }
@@ -457,6 +463,7 @@ fun HomeScreen(
                         onOpenSystemSettings = onOpenSystemSettings,
                         onChooseDefault = onChooseDefault,
                         onOpenAvisos = onOpenAvisos,
+                        onArmSilence = onArmSilence,
                         onNotificationsPaused = onNotificationsPaused,
                         onPhonePaused = onPhonePaused,
                         onSilence = onSilence,
@@ -488,6 +495,7 @@ fun HomeScreen(
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onOpenAvisos = onOpenAvisos,
+                                onArmSilence = onArmSilence,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
                             )
@@ -506,6 +514,7 @@ fun HomeScreen(
                         onOpenSystemSettings = onOpenSystemSettings,
                         onChooseDefault = onChooseDefault,
                         onOpenAvisos = onOpenAvisos,
+                        onArmSilence = onArmSilence,
                         onNotificationsPaused = onNotificationsPaused,
                         onPhonePaused = onPhonePaused,
                         onSilence = onSilence,
@@ -534,6 +543,7 @@ fun HomeScreen(
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onOpenAvisos = onOpenAvisos,
+                                onArmSilence = onArmSilence,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
                             )
@@ -565,6 +575,7 @@ fun HomeScreen(
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onOpenAvisos = onOpenAvisos,
+                                onArmSilence = onArmSilence,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                             )
                         }
@@ -609,6 +620,7 @@ fun HomeScreen(
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
                                 onOpenAvisos = onOpenAvisos,
+                                onArmSilence = onArmSilence,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
                             )
@@ -1153,6 +1165,7 @@ private fun ClockHomePage(
     onPhonePaused: (Boolean) -> Unit,
     onSilence: (SilenceLevel) -> Unit,
     onOpenAvisos: () -> Unit,
+    onArmSilence: () -> Unit = {},
     onLaunch: (String) -> Unit,
     onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
 ) {
@@ -1173,7 +1186,10 @@ private fun ClockHomePage(
                 phonePaused = state.phonePaused,
                 listenerReady = state.nlsReady,
                 onChange = onSilence,
-                onActivate = onOpenAvisos,
+                onActivate = {
+                    onArmSilence()
+                    onOpenAvisos()
+                },
                 modifier = Modifier.padding(horizontal = FocoSpace.page),
             )
             Spacer(
@@ -1194,6 +1210,7 @@ private fun ClockHomePage(
             onPhonePaused = onPhonePaused,
             onSilence = onSilence,
             onOpenAvisos = onOpenAvisos,
+            onArmSilence = onArmSilence,
             onLaunch = onLaunch,
             onUpdateBlock = onUpdateBlock,
             showPill = blocks.none {
@@ -1215,6 +1232,7 @@ private fun BlockPage(
     onPhonePaused: (Boolean) -> Unit,
     onSilence: (SilenceLevel) -> Unit,
     onOpenAvisos: () -> Unit = {},
+    onArmSilence: () -> Unit = {},
     onLaunch: (String) -> Unit,
     onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
     scroll: Boolean = true,
@@ -1233,7 +1251,10 @@ private fun BlockPage(
             onOpenClock = onOpenClock,
             onOpenCalendar = onOpenCalendar,
             onSilence = onSilence,
-            onActivateListener = onOpenAvisos,
+            onActivateListener = {
+                onArmSilence()
+                onOpenAvisos()
+            },
             onNotificationsPaused = onNotificationsPaused,
             onPhonePaused = onPhonePaused,
             onLaunch = onLaunch,
@@ -1247,7 +1268,10 @@ private fun BlockPage(
                 phonePaused = state.phonePaused,
                 listenerReady = state.nlsReady,
                 onChange = onSilence,
-                onActivate = onOpenAvisos,
+                onActivate = {
+                    onArmSilence()
+                    onOpenAvisos()
+                },
                 modifier = Modifier.padding(horizontal = FocoSpace.page),
             )
         }
@@ -1286,6 +1310,7 @@ private fun PersonalHomePage(
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onSilence: (SilenceLevel) -> Unit,
+    onArmSilence: () -> Unit = {},
     onPackagePaused: (String, Boolean) -> Unit,
     onLaunch: (String) -> Unit,
     onOpenGroup: (String) -> Unit,
@@ -1326,7 +1351,10 @@ private fun PersonalHomePage(
                     phonePaused = state.phonePaused,
                     listenerReady = state.nlsReady,
                     onChange = onSilence,
-                    onActivate = onOpenAvisos,
+                    onActivate = {
+                        onArmSilence()
+                        onOpenAvisos()
+                    },
                     modifier = Modifier.padding(horizontal = FocoSpace.page),
                 )
             }
@@ -1626,6 +1654,7 @@ private fun pageLabel(page: HomePageSpec): String {
 private fun HomePagerCue(
     labels: List<String>,
     page: Int,
+    showLabel: Boolean,
     onSelect: (Int) -> Unit,
     onEdit: () -> Unit,
 ) {
@@ -1634,6 +1663,7 @@ private fun HomePagerCue(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .combinedClickable(onClick = {}, onLongClick = onEdit)
             .padding(top = FocoSpace.hair, bottom = FocoSpace.gap),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -1656,16 +1686,14 @@ private fun HomePagerCue(
                 }
             }
         }
-        Text(
-            text = current,
-            modifier = Modifier.combinedClickable(
-                onClick = {},
-                onLongClick = onEdit,
-            ),
-            style = MaterialTheme.typography.bodyMedium,
-            color = FocoPaperDim,
-            fontSize = 11.sp,
-        )
+        if (showLabel && current.isNotBlank()) {
+            Text(
+                text = current,
+                style = MaterialTheme.typography.bodyMedium,
+                color = FocoPaperDim,
+                fontSize = 11.sp,
+            )
+        }
     }
 }
 

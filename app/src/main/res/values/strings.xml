@@ -107,11 +107,14 @@
     <string name="settings_about_calendar">El reloj muestra el Vetus y el Novus.</string>
     <string name="settings_pause_note">Pausar Trabajo oculta las apps de Trabajo. No es la pausa del perfil de trabajo de Android. Silencio no es el No molestar del teléfono.</string>
     <string name="silence_off">Sin pausa</string>
+    <string name="silence_avisos">Avisos</string>
     <string name="silence_foco">Foco</string>
     <string name="silence_all">Todo en pausa</string>
     <string name="silence_activate">Activar avisos</string>
+    <string name="silence_a11y_off">Modo de avisos, Avisos</string>
+    <string name="silence_a11y_on">Modo de avisos, Foco</string>
     <string name="silence_fail">No se pudo cambiar el modo.</string>
-    <string name="silence_sub">Foco pausa lo que Foco controla. Todo en pausa cancela lo que Foco puede ver. No es el No molestar del teléfono.</string>
+    <string name="silence_sub">Los avisos siguen. No es el No molestar del teléfono.</string>
     <string name="santo_line">Santo: %1$s</string>
     <string name="phone_pause">Pausar teléfono</string>
     <string name="phone_resume">Reanudar teléfono</string>

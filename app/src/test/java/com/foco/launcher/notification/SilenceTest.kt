@@ -7,18 +7,12 @@ import org.junit.Test
 
 class SilenceTest {
     @Test
-    fun phonePauseStaysTheStrongerLevel() {
-        assertEquals(SilenceLevel.TODO, Silence.level(notificationsPaused = false, phonePaused = true))
-        assertEquals(SilenceLevel.TODO, Silence.level(notificationsPaused = true, phonePaused = true))
-        assertTrue(Silence.phonePaused(SilenceLevel.TODO))
-        assertTrue(Silence.notificationsPaused(SilenceLevel.TODO))
-    }
-
-    @Test
-    fun avisosAloneStaysAvisos() {
-        assertEquals(SilenceLevel.AVISOS, Silence.level(notificationsPaused = true, phonePaused = false))
-        assertTrue(Silence.notificationsPaused(SilenceLevel.AVISOS))
-        assertFalse(Silence.phonePaused(SilenceLevel.AVISOS))
+    fun eitherStoredPauseReadsAsFocoAndWritesCancelAll() {
+        assertEquals(SilenceLevel.FOCO, Silence.level(notificationsPaused = false, phonePaused = true))
+        assertEquals(SilenceLevel.FOCO, Silence.level(notificationsPaused = true, phonePaused = true))
+        assertEquals(SilenceLevel.FOCO, Silence.level(notificationsPaused = true, phonePaused = false))
+        assertTrue(Silence.phonePaused(SilenceLevel.FOCO))
+        assertTrue(Silence.notificationsPaused(SilenceLevel.FOCO))
     }
 
     @Test
@@ -29,9 +23,16 @@ class SilenceTest {
     }
 
     @Test
-    fun pillCyclesSinPausaThenFocoThenTodo() {
-        assertEquals(SilenceLevel.AVISOS, Silence.next(SilenceLevel.OFF))
-        assertEquals(SilenceLevel.TODO, Silence.next(SilenceLevel.AVISOS))
-        assertEquals(SilenceLevel.OFF, Silence.next(SilenceLevel.TODO))
+    fun pillTogglesOffAndFoco() {
+        assertEquals(SilenceLevel.FOCO, Silence.toggle(SilenceLevel.OFF))
+        assertEquals(SilenceLevel.OFF, Silence.toggle(SilenceLevel.FOCO))
+    }
+
+    @Test
+    fun inScopePauseAlignsToCancelAllAndOffStaysOff() {
+        assertEquals(true to true, Silence.align(notificationsPaused = true, phonePaused = false))
+        assertEquals(true to true, Silence.align(notificationsPaused = false, phonePaused = true))
+        assertEquals(true to true, Silence.align(notificationsPaused = true, phonePaused = true))
+        assertEquals(false to false, Silence.align(notificationsPaused = false, phonePaused = false))
     }
 }

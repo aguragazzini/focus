@@ -32,8 +32,14 @@ data class LauncherPrefs(
     /**
      * Cancel every notification the listener can see. Not system Do Not Disturb.
      * Unpausing stops new cancels and does not restore ones already removed.
+     * With [notificationsPaused], this is the Foco side of the two-state pill.
      */
     val phonePaused: Boolean = false,
+    /**
+     * The pill asked for the listener. The next time it connects, Foco turns on.
+     * A chosen Off is left alone until that tap.
+     */
+    val silenceArmOnConnect: Boolean = false,
     /** These packages do not launch, and the listener cancels their notifications. */
     val pausedPackages: List<String> = emptyList(),
     /**

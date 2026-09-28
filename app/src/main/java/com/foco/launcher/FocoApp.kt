@@ -9,6 +9,7 @@ import com.foco.launcher.notification.FocoNotificationListener
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.NotificationAllowlistStore
 import com.foco.launcher.notification.NotificationPolicyEngine
+import com.foco.launcher.notification.Silence
 import com.foco.launcher.registry.GroupMutations
 import com.foco.launcher.registry.GroupSection
 import com.foco.launcher.registry.PackageRegistry
@@ -21,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class FocoApp : Application() {
@@ -67,6 +69,32 @@ class FocoApp : Application() {
             // Update sideload keeps the grant and drops the bind. Rebind, then scrub.
             NlsStatus.requestRebind(this@FocoApp)
             FocoNotificationListener.scrubIfConnected()
+        }
+        applicationScope.launch {
+            combine(prefsStore.prefs, FocoNotificationListener.connected) { prefs, connected ->
+                prefs to connected
+            }.collect { (_, connected) ->
+                val ready = connected && NlsStatus.isGranted(this@FocoApp)
+                prefsStore.update { current ->
+                    val aligned = Silence.align(
+                        current.notificationsPaused,
+                        current.phonePaused,
+                    ).first
+                    val turnOn = ready && current.silenceArmOnConnect
+                    val on = aligned || turnOn
+                    if (current.notificationsPaused == on &&
+                        current.phonePaused == on &&
+                        current.silenceArmOnConnect == (current.silenceArmOnConnect && !turnOn)
+                    ) {
+                        return@update current
+                    }
+                    current.copy(
+                        notificationsPaused = on,
+                        phonePaused = on,
+                        silenceArmOnConnect = current.silenceArmOnConnect && !turnOn,
+                    )
+                }
+            }
         }
         applicationScope.launch {
             workCatalog.state.collect { work ->
