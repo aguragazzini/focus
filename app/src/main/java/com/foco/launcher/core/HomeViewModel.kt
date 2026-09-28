@@ -280,7 +280,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
                 )
             } catch (_: Exception) {
-                message.value = getApplication<Application>().getString(R.string.silence_fail)
+                if (level == com.foco.launcher.notification.SilenceLevel.FOCO) {
+                    runCatching {
+                        app.prefsStore.setSilence(notificationsPaused = false, phonePaused = false)
+                    }
+                    message.value = getApplication<Application>().getString(R.string.silence_fail)
+                }
             }
         }
     }

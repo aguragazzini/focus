@@ -61,6 +61,7 @@ class SettingsActivity : ComponentActivity() {
                     onToggleFilter = vm::requestEnableFilter,
                     onOpenNlsSettings = {
                         vm.markNlsSettingsOpened()
+                        if (!NlsStatus.isGranted(this)) vm.armSilenceOnConnect()
                         if (!NlsStatus.openListenerSettings(this)) vm.showNlsOpenFailed()
                     },
                     onOpenAppInfo = {

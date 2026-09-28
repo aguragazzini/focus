@@ -111,9 +111,12 @@
     <string name="silence_foco">Foco</string>
     <string name="silence_all">Todo en pausa</string>
     <string name="silence_activate">Activar avisos</string>
-    <string name="silence_a11y_off">Modo de avisos, Avisos</string>
-    <string name="silence_a11y_on">Modo de avisos, Foco</string>
-    <string name="silence_fail">No se pudo cambiar el modo.</string>
+    <string name="silence_a11y_name">Avisos</string>
+    <string name="silence_a11y_off">desactivado</string>
+    <string name="silence_a11y_on">activado</string>
+    <string name="silence_a11y_hint_on">tocá para activar Foco</string>
+    <string name="silence_a11y_hint_off">tocá para dejar pasar avisos</string>
+    <string name="silence_fail">No se pudo activar Foco</string>
     <string name="silence_sub">Los avisos siguen. No es el No molestar del teléfono.</string>
     <string name="santo_line">Santo: %1$s</string>
     <string name="phone_pause">Pausar teléfono</string>

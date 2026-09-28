@@ -274,11 +274,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
                 )
             } catch (_: Exception) {
-                Toast.makeText(
-                    getApplication(),
-                    com.foco.launcher.R.string.silence_fail,
-                    Toast.LENGTH_SHORT,
-                ).show()
+                if (level == com.foco.launcher.notification.SilenceLevel.FOCO) {
+                    runCatching {
+                        app.prefsStore.setSilence(notificationsPaused = false, phonePaused = false)
+                    }
+                    Toast.makeText(
+                        getApplication(),
+                        com.foco.launcher.R.string.silence_fail,
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                }
             }
         }
     }

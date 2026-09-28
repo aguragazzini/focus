@@ -50,6 +50,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -89,6 +91,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.foco.launcher.R
+import kotlinx.coroutines.delay
 import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.notification.SilenceLevel
 import com.foco.launcher.registry.AppGroup
@@ -299,7 +302,17 @@ fun HomeScreen(
 
     LaunchedEffect(state.message) {
         val msg = state.message ?: return@LaunchedEffect
-        snackbar.showSnackbar(msg)
+        val activating = msg == context.getString(R.string.silence_fail)
+        if (activating) {
+            val shown = launch {
+                snackbar.showSnackbar(msg, duration = SnackbarDuration.Indefinite)
+            }
+            delay(2_000)
+            snackbar.currentSnackbarData?.dismiss()
+            shown.join()
+        } else {
+            snackbar.showSnackbar(msg)
+        }
         onMessageShown()
     }
 
@@ -317,7 +330,16 @@ fun HomeScreen(
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = {
+            SnackbarHost(snackbar) { data ->
+                val muted = data.visuals.message == context.getString(R.string.silence_fail)
+                Snackbar(
+                    snackbarData = data,
+                    containerColor = if (muted) FocoInkElevated else FocoPaper,
+                    contentColor = if (muted) FocoPaperDim else FocoInk,
+                )
+            }
+        },
     ) { padding ->
         Box(
             Modifier
@@ -421,6 +443,7 @@ fun HomeScreen(
                         onOpenAvisos = onOpenAvisos,
                         onArmSilence = onArmSilence,
                         onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                        showChromePill = visible.size < 2,
                     )
                     HomePages.TYPE_AGENDA -> {
                         val blocks = com.foco.launcher.registry.PageBlocks.effective(spec)
@@ -1168,6 +1191,7 @@ private fun ClockHomePage(
     onArmSilence: () -> Unit = {},
     onLaunch: (String) -> Unit,
     onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
+    showChromePill: Boolean = false,
 ) {
     val defaultClock = blocks.map { it.type } == com.foco.launcher.registry.PageBlocks.defaultsFor(HomePages.TYPE_CLOCK)
     if (defaultClock) {
@@ -1180,18 +1204,20 @@ private fun ClockHomePage(
                 onOpenClock = onOpenClock,
                 onOpenCalendar = onOpenCalendar,
             )
-            Spacer(Modifier.height(FocoSpace.gap))
-            SilenceControl(
-                notificationsPaused = state.notificationsPaused,
-                phonePaused = state.phonePaused,
-                listenerReady = state.nlsReady,
-                onChange = onSilence,
-                onActivate = {
-                    onArmSilence()
-                    onOpenAvisos()
-                },
-                modifier = Modifier.padding(horizontal = FocoSpace.page),
-            )
+            if (showChromePill) {
+                Spacer(Modifier.height(FocoSpace.gap))
+                SilenceControl(
+                    notificationsPaused = state.notificationsPaused,
+                    phonePaused = state.phonePaused,
+                    listenerReady = state.nlsReady,
+                    onChange = onSilence,
+                    onActivate = {
+                        onArmSilence()
+                        onOpenAvisos()
+                    },
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
+                )
+            }
             Spacer(
                 Modifier
                     .fillMaxWidth()
@@ -1213,7 +1239,7 @@ private fun ClockHomePage(
             onArmSilence = onArmSilence,
             onLaunch = onLaunch,
             onUpdateBlock = onUpdateBlock,
-            showPill = blocks.none {
+            showPill = showChromePill && blocks.none {
                 it.type == com.foco.launcher.registry.PageBlocks.SILENCIO ||
                     it.type == com.foco.launcher.registry.PageBlocks.PAUSAR
             },

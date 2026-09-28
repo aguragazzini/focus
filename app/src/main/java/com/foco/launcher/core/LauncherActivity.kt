@@ -117,6 +117,7 @@ class LauncherActivity : ComponentActivity() {
                         LaunchController.openHomePicker(this@LauncherActivity)
                     },
                     onOpenAvisos = {
+                        vm.armSilenceOnConnect()
                         val dest = if (vm.state.value.nlsAttention == NlsRecovery.Attention.Disconnected) {
                             SettingsActivity.DEST_AVISOS
                         } else {
