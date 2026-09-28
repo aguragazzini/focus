@@ -406,6 +406,7 @@ fun HomeScreen(
                         onPhonePaused = onPhonePaused,
                         onSilence = onSilence,
                         onLaunch = onLaunch,
+                        onOpenAvisos = onOpenAvisos,
                         onUpdateBlock = { onUpdateBlock(spec.id, it) },
                     )
                     HomePages.TYPE_AGENDA -> {
@@ -431,6 +432,7 @@ fun HomeScreen(
                                 onPhonePaused = onPhonePaused,
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
+                                onOpenAvisos = onOpenAvisos,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                             )
                         }
@@ -465,7 +467,10 @@ fun HomeScreen(
                         onDragEnd = { endDrag() },
                         header = {
                             BlockPage(
-                                blocks = com.foco.launcher.registry.PageBlocks.effective(spec),
+                                blocks = com.foco.launcher.registry.PageBlocks.effective(spec).filter {
+                                    it.type != com.foco.launcher.registry.PageBlocks.SILENCIO &&
+                                        it.type != com.foco.launcher.registry.PageBlocks.PAUSAR
+                                },
                                 state = state,
                                 onOpenClock = onOpenClock,
                                 onOpenCalendar = onOpenCalendar,
@@ -474,6 +479,7 @@ fun HomeScreen(
                                 onPhonePaused = onPhonePaused,
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
+                                onOpenAvisos = onOpenAvisos,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
                             )
@@ -519,6 +525,7 @@ fun HomeScreen(
                                 onPhonePaused = onPhonePaused,
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
+                                onOpenAvisos = onOpenAvisos,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
                             )
@@ -549,6 +556,7 @@ fun HomeScreen(
                                 onPhonePaused = onPhonePaused,
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
+                                onOpenAvisos = onOpenAvisos,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                             )
                         }
@@ -592,6 +600,7 @@ fun HomeScreen(
                                 onPhonePaused = onPhonePaused,
                                 onSilence = onSilence,
                                 onLaunch = onLaunch,
+                                onOpenAvisos = onOpenAvisos,
                                 onUpdateBlock = { onUpdateBlock(spec.id, it) },
                                 scroll = false,
                             )
@@ -1135,21 +1144,56 @@ private fun ClockHomePage(
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onSilence: (SilenceLevel) -> Unit,
+    onOpenAvisos: () -> Unit,
     onLaunch: (String) -> Unit,
     onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
 ) {
-    BlockPage(
-        blocks = blocks,
-        state = state,
-        onOpenClock = onOpenClock,
-        onOpenCalendar = onOpenCalendar,
-        onOpenSystemSettings = onOpenSystemSettings,
-        onNotificationsPaused = onNotificationsPaused,
-        onPhonePaused = onPhonePaused,
-        onSilence = onSilence,
-        onLaunch = onLaunch,
-        onUpdateBlock = onUpdateBlock,
-    )
+    val defaultClock = blocks.map { it.type } == com.foco.launcher.registry.PageBlocks.defaultsFor(HomePages.TYPE_CLOCK)
+    if (defaultClock) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+        ) {
+            DefaultClockGlance(
+                onOpenClock = onOpenClock,
+                onOpenCalendar = onOpenCalendar,
+            )
+            Spacer(Modifier.height(FocoSpace.gap))
+            SilenceControl(
+                notificationsPaused = state.notificationsPaused,
+                phonePaused = state.phonePaused,
+                listenerReady = state.nlsReady,
+                onChange = onSilence,
+                onActivate = onOpenAvisos,
+                modifier = Modifier.padding(horizontal = FocoSpace.page),
+            )
+            Spacer(
+                Modifier
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .homeLongPress(onOpenSystemSettings),
+            )
+        }
+    } else {
+        BlockPage(
+            blocks = blocks,
+            state = state,
+            onOpenClock = onOpenClock,
+            onOpenCalendar = onOpenCalendar,
+            onOpenSystemSettings = onOpenSystemSettings,
+            onNotificationsPaused = onNotificationsPaused,
+            onPhonePaused = onPhonePaused,
+            onSilence = onSilence,
+            onOpenAvisos = onOpenAvisos,
+            onLaunch = onLaunch,
+            onUpdateBlock = onUpdateBlock,
+            showPill = blocks.none {
+                it.type == com.foco.launcher.registry.PageBlocks.SILENCIO ||
+                    it.type == com.foco.launcher.registry.PageBlocks.PAUSAR
+            },
+        )
+    }
 }
 
 @Composable
@@ -1162,11 +1206,13 @@ private fun BlockPage(
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onSilence: (SilenceLevel) -> Unit,
+    onOpenAvisos: () -> Unit = {},
     onLaunch: (String) -> Unit,
     onUpdateBlock: (com.foco.launcher.registry.PageBlock) -> Unit,
     scroll: Boolean = true,
+    showPill: Boolean = false,
 ) {
-    if (!scroll && blocks.isEmpty()) return
+    if (!scroll && blocks.isEmpty() && !showPill) return
     val body: @Composable () -> Unit = {
         PageBlockColumn(
             blocks = blocks,
@@ -1175,15 +1221,28 @@ private fun BlockPage(
             hasWorkProfile = state.hasWorkProfile,
             notificationsPaused = state.notificationsPaused,
             phonePaused = state.phonePaused,
+            listenerReady = state.nlsReady,
             onOpenClock = onOpenClock,
             onOpenCalendar = onOpenCalendar,
             onSilence = onSilence,
+            onActivateListener = onOpenAvisos,
             onNotificationsPaused = onNotificationsPaused,
             onPhonePaused = onPhonePaused,
             onLaunch = onLaunch,
             onUpdateBlock = onUpdateBlock,
             showEmpty = scroll,
         )
+        if (showPill) {
+            Spacer(Modifier.height(FocoSpace.gap))
+            SilenceControl(
+                notificationsPaused = state.notificationsPaused,
+                phonePaused = state.phonePaused,
+                listenerReady = state.nlsReady,
+                onChange = onSilence,
+                onActivate = onOpenAvisos,
+                modifier = Modifier.padding(horizontal = FocoSpace.page),
+            )
+        }
         Spacer(
             Modifier
                 .fillMaxWidth()
@@ -1257,8 +1316,9 @@ private fun PersonalHomePage(
                 SilenceControl(
                     notificationsPaused = state.notificationsPaused,
                     phonePaused = state.phonePaused,
+                    listenerReady = state.nlsReady,
                     onChange = onSilence,
-                    avisosIdle = stringResource(R.string.nls_pause),
+                    onActivate = onOpenAvisos,
                     modifier = Modifier.padding(horizontal = FocoSpace.page),
                 )
             }

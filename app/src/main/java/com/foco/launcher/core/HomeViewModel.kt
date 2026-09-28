@@ -60,6 +60,7 @@ data class HomeUiState(
     val workSectionPaused: Boolean = false,
     val notificationsPaused: Boolean = false,
     val phonePaused: Boolean = false,
+    val nlsReady: Boolean = false,
     val pausedPackages: List<String> = emptyList(),
     val namesOnly: Boolean = false,
     val homePages: List<HomePageSpec> = HomePages.defaults(),
@@ -267,10 +268,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setSilence(level: com.foco.launcher.notification.SilenceLevel) {
         viewModelScope.launch {
-            app.prefsStore.setSilence(
-                notificationsPaused = com.foco.launcher.notification.Silence.notificationsPaused(level),
-                phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
-            )
+            try {
+                app.prefsStore.setSilence(
+                    notificationsPaused = com.foco.launcher.notification.Silence.notificationsPaused(level),
+                    phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
+                )
+            } catch (_: Exception) {
+                message.value = getApplication<Application>().getString(R.string.silence_fail)
+            }
         }
     }
 
@@ -378,6 +383,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             workSectionPaused = snap.prefs.workSectionPaused,
             notificationsPaused = snap.prefs.notificationsPaused,
             phonePaused = snap.prefs.phonePaused,
+            nlsReady = granted && listenerConnected,
             pausedPackages = snap.prefs.pausedPackages,
             namesOnly = snap.prefs.namesOnly,
             homePages = HomePages.resolve(snap.prefs.pages, snap.prefs.pageLayoutEdited),

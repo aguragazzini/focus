@@ -1,6 +1,7 @@
 package com.foco.launcher.settings
 
 import android.app.Application
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -261,10 +262,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun setSilence(level: com.foco.launcher.notification.SilenceLevel) {
         viewModelScope.launch {
-            app.prefsStore.setSilence(
-                notificationsPaused = com.foco.launcher.notification.Silence.notificationsPaused(level),
-                phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
-            )
+            try {
+                app.prefsStore.setSilence(
+                    notificationsPaused = com.foco.launcher.notification.Silence.notificationsPaused(level),
+                    phonePaused = com.foco.launcher.notification.Silence.phonePaused(level),
+                )
+            } catch (_: Exception) {
+                Toast.makeText(
+                    getApplication(),
+                    com.foco.launcher.R.string.silence_fail,
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
         }
     }
 

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
@@ -53,7 +54,9 @@ fun PageBlockColumn(
     phonePaused: Boolean,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
+    listenerReady: Boolean,
     onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
+    onActivateListener: () -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onLaunch: (String) -> Unit,
@@ -133,7 +136,9 @@ fun PageBlockColumn(
                     phonePaused = phonePaused,
                     onOpenClock = onOpenClock,
                     onOpenCalendar = onOpenCalendar,
+                    listenerReady = listenerReady,
                     onSilence = onSilence,
+                    onActivateListener = onActivateListener,
                     onNotificationsPaused = onNotificationsPaused,
                     onPhonePaused = onPhonePaused,
                     onLaunch = onLaunch,
@@ -145,8 +150,106 @@ fun PageBlockColumn(
 }
 
 /**
+ * Default Reloj rhythm: digits, fecha, one saint line, battery and alarm, temperature when it answers.
+ * Edited pages keep their own blocks.
+ */
+@Composable
+fun DefaultClockGlance(
+    onOpenClock: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    modifier: Modifier = Modifier,
+    zone: ZoneId = HomeClockFormat.CIVIL_ZONE,
+) {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            while (true) {
+                now = System.currentTimeMillis()
+                delay(30_000L)
+            }
+        }
+    }
+    val day = remember(now, zone) { Instant.ofEpochMilli(now).atZone(zone).toLocalDate() }
+    val vetus = remember(context) { loadVetus(context) }
+    val novus = remember(context) { loadNovus(context) }
+    var celsius by remember { mutableIntStateOf(Int.MIN_VALUE) }
+    LaunchedEffect(Unit) {
+        val value = withContext(Dispatchers.IO) { CordobaWeather.fetchCelsius() }
+        celsius = value ?: Int.MIN_VALUE
+    }
+    val saint = novus?.let { SantoralNovus.resolve(it, day) }?.name?.trim().orEmpty()
+        .ifBlank { vetus?.let { Santoral1962.resolve(it, day) }?.name?.trim().orEmpty() }
+    val glance = remember(now, zone) { HomeGlance.line(context, zone) }
+    val muted = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, lineHeight = 17.sp)
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = FocoSpace.gap),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        HomeClock(
+            onOpenClock = onOpenClock,
+            onOpenCalendar = onOpenCalendar,
+            zone = zone,
+            readGlance = { null },
+            showDate = false,
+            showGlance = false,
+        )
+        Text(
+            text = HomeClockFormat.date(now, zone),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenCalendar)
+                .padding(horizontal = FocoSpace.page),
+            style = MaterialTheme.typography.bodyLarge,
+            color = FocoPaper,
+            textAlign = TextAlign.Center,
+        )
+        if (saint.isNotBlank()) {
+            Spacer(Modifier.height(FocoSpace.hair))
+            Text(
+                text = stringResource(R.string.santo_line, saint),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page),
+                style = muted,
+                color = FocoPaperDim,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (!glance.isNullOrBlank()) {
+            Spacer(Modifier.height(FocoSpace.gap))
+            Text(
+                text = glance,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page),
+                style = muted,
+                color = FocoPaperDim,
+                textAlign = TextAlign.Center,
+            )
+        }
+        if (celsius != Int.MIN_VALUE) {
+            Spacer(Modifier.height(FocoSpace.hair))
+            Text(
+                text = "$celsius°",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = FocoSpace.page),
+                style = muted,
+                color = FocoPaper,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
  * One centered caption. Reloj skips it: the page name is already Reloj and the digits are the block.
  * Vetus and Novus use this caption and hide the title inside [SantoralLine].
+ * Silencio and Pausar todo are the pill itself, so they do not add a second title.
  */
 @Composable
 private fun frameLabel(type: String): String? {
@@ -199,7 +302,9 @@ private fun BlockBody(
     phonePaused: Boolean,
     onOpenClock: () -> Unit,
     onOpenCalendar: () -> Unit,
+    listenerReady: Boolean,
     onSilence: (com.foco.launcher.notification.SilenceLevel) -> Unit,
+    onActivateListener: () -> Unit,
     onNotificationsPaused: (Boolean) -> Unit,
     onPhonePaused: (Boolean) -> Unit,
     onLaunch: (String) -> Unit,
@@ -264,8 +369,9 @@ private fun BlockBody(
         PageBlocks.SILENCIO, PageBlocks.PAUSAR -> SilenceControl(
             notificationsPaused = notificationsPaused,
             phonePaused = phonePaused,
+            listenerReady = listenerReady,
             onChange = onSilence,
-            avisosIdle = stringResource(R.string.nls_pause),
+            onActivate = onActivateListener,
         )
         PageBlocks.ATAJOS -> AppNames(apps.take(4), onLaunch)
         PageBlocks.TRABAJO -> {

@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -266,32 +267,14 @@ private fun SettingsMain(
                     PinSettingsRow()
                 }
                 HorizontalDivider()
-                Column(modifier = Modifier.padding(top = 8.dp)) {
+                Column(modifier = Modifier.padding(top = 8.dp, bottom = 8.dp)) {
                     val silence = Silence.level(state.notificationsPaused, state.phonePaused)
-                    Text(
-                        text = stringResource(R.string.silencio_title),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onBackground,
-                        modifier = Modifier.padding(horizontal = 20.dp),
-                    )
-                    Text(
-                        text = stringResource(
-                            when (silence) {
-                                SilenceLevel.TODO -> R.string.silencio_todo_on
-                                SilenceLevel.AVISOS -> R.string.nls_paused_chip
-                                SilenceLevel.OFF -> R.string.nls_list_status
-                            },
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = FocoPaperDim,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
-                    )
                     SilenceControl(
                         notificationsPaused = state.notificationsPaused,
                         phonePaused = state.phonePaused,
+                        listenerReady = state.nlsGranted && state.nlsConnected,
                         onChange = onSilence,
-                        avisosIdle = stringResource(R.string.nls_pause),
-                        showTitle = false,
+                        onActivate = onOpenNlsSettings,
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                     )
                     Text(
@@ -299,12 +282,15 @@ private fun SettingsMain(
                             when (silence) {
                                 SilenceLevel.TODO -> R.string.phone_pause_sub
                                 SilenceLevel.AVISOS -> R.string.nls_pause_sub
-                                SilenceLevel.OFF -> R.string.silencio_sub
+                                SilenceLevel.OFF -> R.string.silence_sub
                             },
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                         color = FocoPaperDim,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 4.dp),
                     )
                 }
                 SettingsRow(

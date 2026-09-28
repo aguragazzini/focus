@@ -4,14 +4,22 @@ versionName `0.9.6`, versionCode `21`. Same `signing/foco-debug.keystore`.
 
 ## Centered glance blocks
 
-Home block captions and values are centered on a full-width column. Reloj keeps the page name at the top and shows only the digits in the block. Vetus and Novus keep one caption; the saint line no longer repeats the title. Fecha, Batería, and Alarma stack a centered label over a centered value.
+Home block captions and values are centered on a full-width column. Reloj keeps the page name at the top and shows only the digits in the block. Vetus and Novus keep one caption when they are separate blocks. Fecha, Batería, and Alarma stack a centered label over a centered value.
 
-Personal and Trabajo section titles are centered. Their app grids stay as they were. Agenda event rows stay a list; the page title, date, and section labels are centered.
+Personal and Trabajo section titles are centered. Their app grids stay as they were. Agenda event rows stay a list. Page edit from 0.9.5 is unchanged.
 
-Page edit from 0.9.5 is unchanged.
+## One pill
 
-## One silence control
+One pill, a bell plus the mode that is on. Tap cycles **Sin pausa → Foco → Todo en pausa → Sin pausa**.
 
-Personal used to show Pausar avisos and Pausar teléfono as two pills. They are one control now, titled Silencio. Neither half lit follows the list. Avisos is the in-scope cancel (calls, alarms, media, and protected system packages stay). Todo cancels every notification the listener can see. Tap the lit half to clear both. The same track is the Silencio and Pausar todo blocks, and the control in Ajustes.
+- Sin pausa: Foco does not cancel.
+- Foco: the in-scope cancel. Calls, alarms, navigation, transport, media, and protected system packages stay.
+- Todo en pausa: cancels every notification the listener can see, and the pill uses a stronger Paper border.
+- Without a listener the pill says **Activar avisos** and opens the existing permission flow.
+- If the mode cannot be saved, home shows **No se pudo cambiar el modo.**
 
-If the phone pause was already on, the control opens on Todo and does not clear it. If only avisos was on, it opens on Avisos. Pausar Trabajo still only hides work apps. A long-press still pauses one app. Nothing writes system Do Not Disturb.
+A phone pause that was already on opens on Todo en pausa and stays there until a tap. Avisos alone opens on Foco. Pausar Trabajo stays off this cycle. A long-press still pauses one app. Nothing writes system Do Not Disturb.
+
+## Default Reloj rhythm
+
+Digits, then the date, then `Santo: {nombre}` at 13sp when a name exists, then battery and alarm on one line, then the temperature when it answers, then the pill. Edited pages keep their own blocks. Personal keeps the pill under its glances and above the grid.

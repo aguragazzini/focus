@@ -27,4 +27,11 @@ class SilenceTest {
         assertFalse(Silence.notificationsPaused(SilenceLevel.OFF))
         assertFalse(Silence.phonePaused(SilenceLevel.OFF))
     }
+
+    @Test
+    fun pillCyclesSinPausaThenFocoThenTodo() {
+        assertEquals(SilenceLevel.AVISOS, Silence.next(SilenceLevel.OFF))
+        assertEquals(SilenceLevel.TODO, Silence.next(SilenceLevel.AVISOS))
+        assertEquals(SilenceLevel.OFF, Silence.next(SilenceLevel.TODO))
+    }
 }
