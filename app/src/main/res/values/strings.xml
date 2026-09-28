@@ -145,6 +145,16 @@
     <string name="page_clock">Reloj</string>
     <string name="page_agenda">Agenda</string>
     <string name="page_diet">Comida</string>
+    <string name="page_uso">Uso</string>
+    <string name="uso_scope">Uso del perfil personal</string>
+    <string name="uso_permission_title">Ver tu uso</string>
+    <string name="uso_permission">Foco necesita permiso de uso de apps. Se abre en Ajustes del sistema.</string>
+    <string name="uso_permission_cta">Activar uso</string>
+    <string name="uso_empty">No hay uso registrado en estos días.</string>
+    <string name="uso_chip_today">Hoy</string>
+    <string name="uso_chip_week">7 días</string>
+    <string name="uso_restricted">Si al volver el acceso sigue sin concederse, en algunos teléfonos: Apps → Foco → ⋮ → Permitir ajustes restringidos.</string>
+    <string name="uso_open_fail">No se abrió el acceso de uso.</string>
     <string name="agenda_permission">Foco necesita permiso para ver los eventos de hoy.</string>
     <string name="agenda_permission_cta">Permitir</string>
     <string name="agenda_permission_settings">Abrir ajustes de Foco</string>

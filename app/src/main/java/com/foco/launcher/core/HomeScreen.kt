@@ -584,6 +584,30 @@ fun HomeScreen(
                             )
                         },
                     )
+                    HomePages.TYPE_USO -> {
+                        if (spec.blocksSet) {
+                            BlockPage(
+                                blocks = com.foco.launcher.registry.PageBlocks.effective(spec),
+                                state = state,
+                                onOpenClock = onOpenClock,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                onNotificationsPaused = onNotificationsPaused,
+                                onPhonePaused = onPhonePaused,
+                                onSilence = onSilence,
+                                onLaunch = onLaunch,
+                                onOpenAvisos = onOpenAvisos,
+                                onArmSilence = onArmSilence,
+                                onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                            )
+                        } else {
+                            UsageHomePage(
+                                title = spec.label,
+                                onLaunch = onLaunch,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                            )
+                        }
+                    }
                     HomePages.TYPE_DIET -> {
                         val meals = remember(context) {
                             DietPlan.peek() ?: runCatching {
@@ -1126,6 +1150,7 @@ private fun HomePageTypePicker(onPick: (String, String) -> Unit) {
         HomePages.TYPE_CLOCK to R.string.page_clock,
         HomePages.TYPE_AGENDA to R.string.page_agenda,
         HomePages.TYPE_PERSONAL to R.string.section_personal,
+        HomePages.TYPE_USO to R.string.page_uso,
         HomePages.TYPE_APPS to R.string.home_page_apps,
         HomePages.TYPE_DIET to R.string.page_diet,
         HomePages.TYPE_WORK to R.string.section_work,
@@ -1681,6 +1706,7 @@ private fun pageLabel(page: HomePageSpec): String {
             HomePages.TYPE_CLOCK -> R.string.page_clock
             HomePages.TYPE_AGENDA -> R.string.page_agenda
             HomePages.TYPE_PERSONAL -> R.string.section_personal
+            HomePages.TYPE_USO -> R.string.page_uso
             HomePages.TYPE_DIET -> R.string.page_diet
             HomePages.TYPE_WORK -> R.string.section_work
             else -> R.string.home_page_apps
