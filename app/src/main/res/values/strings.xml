@@ -138,7 +138,8 @@
     <string name="agenda_empty">No hay eventos hoy</string>
     <string name="agenda_all_day">Todo el día</string>
     <string name="agenda_untitled">Sin título</string>
-    <string name="agenda_work_unavailable">No se pueden leer los calendarios de Trabajo desde acá.</string>
+    <string name="agenda_work_unavailable">El perfil de trabajo aísla sus calendarios.\nFoco no puede leerlos desde acá.</string>
+    <string name="agenda_work_isolated">El perfil de trabajo aísla sus calendarios.\nEsto sale de calendarios de este perfil que parecen de trabajo.</string>
     <string name="agenda_work_cta">Abrir calendario de Trabajo</string>
     <string name="settings_agenda">Agenda</string>
     <string name="settings_agenda_on">El calendario se puede leer.</string>
@@ -201,7 +202,7 @@
     <string name="nls_title">Notificaciones</string>
     <string name="nls_body">Foco puede silenciar avisos de apps que no elegiste. Las de tu lista siguen igual.</string>
     <string name="nls_how">Android pide permiso de acceso a notificaciones. En la lista, activá Foco.</string>
-    <string name="nls_step_restricted">Paso 1. Apps → Foco → ⋮ → Permitir ajustes restringidos.</string>
+    <string name="nls_step_restricted">Paso 1. En algunos teléfonos: Apps → Foco → ⋮ → Permitir ajustes restringidos. Si no ves el ⋮, buscá «ajustes restringidos» en Ajustes.</string>
     <string name="nls_step_access">Paso 2. Acceso a notificaciones → activar Foco.</string>
     <string name="nls_step_toggle">Paso 3. En Foco, activá Silenciar otras notificaciones.</string>
     <string name="nls_open_app_info">Abrir info de la app</string>
@@ -216,7 +217,13 @@
     <string name="nls_done">Listo.</string>
     <string name="nls_toggle">Silenciar otras notificaciones</string>
     <string name="nls_master_sub">En el perfil personal, solo avisan las apps que marques abajo.</string>
-    <string name="nls_moto_hint">Si esa pantalla no se abre: Ajustes → Apps → Foco → ⋮ → Permitir ajustes restringidos. Después, Acceso a notificaciones.</string>
+    <string name="nls_moto_hint">Si esa pantalla no se abre, buscá «ajustes restringidos» en Ajustes, o entrá a la info de Foco desde Acceso a notificaciones. Después, activá Foco ahí.</string>
+    <string name="restricted_title">Ajustes restringidos</string>
+    <string name="restricted_body">En Motorola y Android 13 o posterior, el menú ⋮ de «Permitir ajustes restringidos» aparece solo en algunos caminos. Foco no puede dibujar ese menú del sistema.</string>
+    <string name="restricted_steps">Si no ves el ⋮, buscá en Ajustes «ajustes restringidos». Otra vía: abrí Acceso a notificaciones desde acá y, en esa pantalla, entrá a la info de Foco.</string>
+    <string name="restricted_app_info">Info de la app</string>
+    <string name="restricted_nls">Acceso a notificaciones</string>
+    <string name="restricted_all_apps">Lista de apps</string>
     <string name="nls_banner_disconnected">El filtro de avisos se desconectó.</string>
     <string name="nls_open_fail">No se abrió el acceso a notificaciones.</string>
     <string name="clock_time_cd">Hora %1$s</string>

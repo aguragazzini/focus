@@ -91,6 +91,7 @@ import androidx.compose.ui.zIndex
 import com.foco.launcher.R
 import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.registry.AppGroup
+import com.foco.launcher.registry.AppOrder
 import com.foco.launcher.registry.HomePageSpec
 import com.foco.launcher.registry.HomePages
 import com.foco.launcher.registry.ArrangedSection
@@ -1074,7 +1075,8 @@ private fun PersonalHomePage(
                     personalByPkg[id]?.toCell()?.copy(paused = id in paused)
                 },
                 folder = { group ->
-                    val members = group.members.mapNotNull { personalByPkg[it] }
+                    val members = membersByLabel(group.members) { personalByPkg[it]?.label ?: it }
+                        .mapNotNull { personalByPkg[it] }
                     group.toCell(members.map { it.icon }, labels = members.map { it.label })
                 },
             ).chunked(4)
@@ -1257,8 +1259,9 @@ private fun WorkHomePage(
                                 }
                             },
                             folder = { group ->
-                                val icons = group.members.map { state.workIcons[it] }
-                                val labels = group.members.mapNotNull { byKey[it]?.label }
+                                val ordered = membersByLabel(group.members) { byKey[it]?.label ?: it }
+                                val icons = ordered.map { state.workIcons[it] }
+                                val labels = ordered.mapNotNull { byKey[it]?.label }
                                 group.toCell(icons, muted, labels)
                             },
                         )
@@ -1300,6 +1303,7 @@ private fun WorkHomePage(
                                     arranged.groups
                                         .find { it.id == cell.groupId }
                                         ?.members
+                                        ?.let { ids -> membersByLabel(ids) { byKey[it]?.label ?: it } }
                                         ?.take(4)
                                         ?.forEach(onEnsureWorkIcon)
                                 } else {
@@ -1686,6 +1690,11 @@ private fun AppGroup.toCell(
         folderIcons = icons.take(4),
         memberLabels = labels.take(4),
     )
+}
+
+/** Apps inside a folder. The folder tile itself stays in the user's group order. */
+private fun membersByLabel(ids: List<String>, labelOf: (String) -> String): List<String> {
+    return AppOrder.byLabel(ids, labelOf) { it }
 }
 
 private fun sectionCells(
@@ -2113,7 +2122,8 @@ private fun OpenGroupSheet(
         when (group.section) {
             GroupSection.PERSONAL -> {
                 val byPkg = personalApps.associateBy { it.packageName }
-                for (member in group.members) {
+                val ordered = membersByLabel(group.members) { byPkg[it]?.label ?: it }
+                for (member in ordered) {
                     val app = byPkg[member] ?: continue
                     MemberRow(
                         label = app.label,
@@ -2125,7 +2135,8 @@ private fun OpenGroupSheet(
             }
             GroupSection.WORK -> {
                 val byKey = workApps.associateBy { it.key }
-                for (member in group.members) {
+                val ordered = membersByLabel(group.members) { byKey[it]?.label ?: it }
+                for (member in ordered) {
                     val app = byKey[member] ?: continue
                     MemberRow(
                         label = app.label,
@@ -2323,11 +2334,13 @@ private fun OpenFolderOverlay(
     val cells = when (group.section) {
         GroupSection.PERSONAL -> {
             val byPkg = personalApps.associateBy { it.packageName }
-            group.members.mapNotNull { id -> byPkg[id]?.toCell() }
+            membersByLabel(group.members) { byPkg[it]?.label ?: it }
+                .mapNotNull { id -> byPkg[id]?.toCell() }
         }
         GroupSection.WORK -> {
             val byKey = workApps.associateBy { it.key }
-            group.members.mapNotNull { id -> byKey[id]?.toCell(workIcons[id], workMuted) }
+            membersByLabel(group.members) { byKey[it]?.label ?: it }
+                .mapNotNull { id -> byKey[id]?.toCell(workIcons[id], workMuted) }
         }
     }
     Box(

@@ -102,6 +102,7 @@ fun SettingsHost(
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
+    onOpenAllApps: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
     when (state.dest) {
@@ -121,6 +122,9 @@ fun SettingsHost(
             onNamesOnly = onNamesOnly,
             onEditHome = onEditHome,
             onRequestCalendar = onRequestCalendar,
+            onOpenAppInfo = onOpenAppInfo,
+            onOpenNlsSettings = onOpenNlsSettings,
+            onOpenAllApps = onOpenAllApps,
         )
         SettingsDest.Edit -> EditAppsScreen(
             state = state,
@@ -181,6 +185,9 @@ private fun SettingsMain(
     onNamesOnly: (Boolean) -> Unit,
     onEditHome: () -> Unit,
     onRequestCalendar: () -> Unit,
+    onOpenAppInfo: () -> Unit,
+    onOpenNlsSettings: () -> Unit,
+    onOpenAllApps: () -> Unit,
 ) {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -314,6 +321,12 @@ private fun SettingsMain(
                 HorizontalDivider()
                 SettingsRow(stringResource(R.string.settings_system), onClick = onOpenSystemSettings)
                 HorizontalDivider()
+                RestrictedSettingsBlock(
+                    onOpenAppInfo = onOpenAppInfo,
+                    onOpenNlsSettings = onOpenNlsSettings,
+                    onOpenAllApps = onOpenAllApps,
+                )
+                HorizontalDivider()
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
                     Text(
                         text = stringResource(R.string.settings_version),
@@ -342,6 +355,51 @@ private fun SettingsMain(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RestrictedSettingsBlock(
+    onOpenAppInfo: () -> Unit,
+    onOpenNlsSettings: () -> Unit,
+    onOpenAllApps: () -> Unit,
+) {
+    Column(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)) {
+        Text(
+            text = stringResource(R.string.restricted_title),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onBackground,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+        )
+        Text(
+            text = stringResource(R.string.restricted_body),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.restricted_steps),
+            style = MaterialTheme.typography.bodyMedium,
+            color = FocoPaperDim,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp),
+        )
+        SettingsRow(
+            title = stringResource(R.string.restricted_app_info),
+            onClick = onOpenAppInfo,
+        )
+        SettingsRow(
+            title = stringResource(R.string.restricted_nls),
+            onClick = onOpenNlsSettings,
+        )
+        SettingsRow(
+            title = stringResource(R.string.restricted_all_apps),
+            onClick = onOpenAllApps,
+        )
     }
 }
 

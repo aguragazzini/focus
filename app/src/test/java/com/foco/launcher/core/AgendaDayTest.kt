@@ -71,4 +71,30 @@ class AgendaDayTest {
         assertFalse(picked.any { it.title == "Cancelada" })
         assertFalse(picked.any { it.title == "Ayer" })
     }
+
+    @Test
+    fun workHeuristicUsesWholeWordsAndAccountTypeSegments() {
+        assertTrue(AgendaDay.looksLikeWork("Calendario de trabajo", "", ""))
+        assertTrue(AgendaDay.looksLikeWork("My Work", "agus@x.com", "com.google"))
+        assertTrue(AgendaDay.looksLikeWork("Trabajo", "", "com.google"))
+        assertTrue(AgendaDay.looksLikeWork("Personal", "work@empresa.com", "com.google"))
+        assertTrue(AgendaDay.looksLikeWork("Personal", "a@b.com", "com.google.android.exchange"))
+        assertTrue(AgendaDay.looksLikeWork("Personal", "a@b.com", "com.android.email.activesync"))
+        assertFalse(AgendaDay.looksLikeWork("Homework", "", "com.google"))
+        assertFalse(AgendaDay.looksLikeWork("workshop", "", ""))
+        assertFalse(AgendaDay.looksLikeWork("Network", "net@x.com", "com.google"))
+        assertFalse(AgendaDay.looksLikeWork("Oficina", "agus@empresa.com", "com.google"))
+        assertFalse(AgendaDay.looksLikeWork("Personal", "agus@empresa.com", "com.google"))
+    }
+
+    @Test
+    fun mergeKeepsEnterpriseAndDropsTheSamePersonalCopy() {
+        val row = AgendaRow(1, "Standup", "", 10L, 20L, false, 0, null, AgendaSide.WORK)
+        val named = AgendaRow(9, "Standup", "Trabajo", 10L, 20L, false, 0, null, AgendaSide.PERSONAL, calendarId = 4)
+        val other = AgendaRow(3, "1:1", "Trabajo", 30L, 40L, false, 0, null, AgendaSide.PERSONAL)
+        val merged = AgendaDay.mergeWork(listOf(row), listOf(named, other))
+        assertEquals(listOf("Standup", "1:1"), merged.map { it.title })
+        assertEquals("Trabajo", merged.first().calendarName)
+        assertTrue(merged.all { it.side == AgendaSide.WORK })
+    }
 }

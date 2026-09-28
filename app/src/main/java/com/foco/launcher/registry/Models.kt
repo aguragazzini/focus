@@ -18,6 +18,11 @@ data class LauncherPrefs(
     val nlsFilterEnabled: Boolean = false,
     /** Home folders. Absent on v0.5.1 documents; decode falls back to empty. */
     val groups: List<AppGroup> = emptyList(),
+    /**
+     * Personal whitelist order was changed with the up/down controls.
+     * Until then the home and the editor show Spanish A→Z, not insertion order.
+     */
+    val whitelistCustomOrder: Boolean = false,
     /** Hide the Trabajo section and cancel in-scope work notifications. Not system quiet mode. */
     val workSectionPaused: Boolean = false,
     /** Foco silence. Cancels in-scope notifications. Not system Do Not Disturb. */

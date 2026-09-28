@@ -18,6 +18,7 @@ import com.foco.launcher.registry.HomePages
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.WhitelistMutations
+import com.foco.launcher.registry.WhitelistOrder
 import com.foco.launcher.registry.withEntries
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkApp
@@ -414,9 +415,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private fun visible(prefs: LauncherPrefs, all: List<LaunchableApp>): List<LaunchableApp> {
         if (all.isEmpty()) return emptyList()
         val byPkg = all.associateBy { it.packageName }
-        return prefs.entries
-            .sortedBy { it.order }
-            .mapNotNull { byPkg[it.packageName] }
+        return WhitelistOrder.displayed(prefs.entries, prefs.whitelistCustomOrder) { pkg ->
+            byPkg[pkg]?.label ?: pkg
+        }.mapNotNull { byPkg[it.packageName] }
     }
 
     companion object {

@@ -11,10 +11,12 @@ import com.foco.launcher.notification.NlsRecovery
 import com.foco.launcher.notification.NlsStatus
 import com.foco.launcher.notification.UserProfileHelper
 import com.foco.launcher.core.LaunchpadRules
+import com.foco.launcher.registry.AppOrder
 import com.foco.launcher.registry.LaunchableApp
 import com.foco.launcher.registry.LauncherPrefs
 import com.foco.launcher.registry.SuggestedApps
 import com.foco.launcher.registry.WhitelistMutations
+import com.foco.launcher.registry.WhitelistOrder
 import com.foco.launcher.registry.withEntries
 import com.foco.launcher.security.BiometricGate
 import com.foco.launcher.work.WorkCatalogRules
@@ -313,12 +315,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
     fun move(packageName: String, delta: Int) {
         viewModelScope.launch {
+            val labels = app.registry.launchables.value.associate { it.packageName to it.label }
             app.prefsStore.update { prefs ->
-                val ordered = prefs.entries.sortedBy { it.order }
-                val index = ordered.indexOfFirst { it.packageName == packageName }
+                val displayed = WhitelistOrder.displayed(
+                    entries = prefs.entries,
+                    customOrder = prefs.whitelistCustomOrder,
+                    labelOf = { pkg -> labels[pkg] ?: pkg },
+                )
+                val index = displayed.indexOfFirst { it.packageName == packageName }
                 if (index < 0) return@update prefs
-                val to = (index + delta).coerceIn(0, ordered.lastIndex)
-                prefs.withEntries(WhitelistMutations.move(ordered, index, to))
+                val to = (index + delta).coerceIn(0, displayed.lastIndex)
+                val moved = WhitelistMutations.reorderDisplayed(displayed, index, to)
+                prefs.withEntries(moved).copy(whitelistCustomOrder = true)
             }
         }
     }
@@ -337,10 +345,18 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         message: String?,
     ): SettingsUiState {
         val byPkg = core.all.associateBy { it.packageName }
-        val whitelist = core.prefs.entries.sortedBy { it.order }.mapNotNull { byPkg[it.packageName] }
+        val whitelist = WhitelistOrder.displayed(
+            entries = core.prefs.entries,
+            customOrder = core.prefs.whitelistCustomOrder,
+            labelOf = { pkg -> byPkg[pkg]?.label ?: pkg },
+        ).mapNotNull { byPkg[it.packageName] }
         val selected = core.prefs.entries.map { it.packageName }.toSet()
         // Personal launcher activities only. Work-profile activities stay in WorkCatalog.
-        val catalog = core.all.filterNot { it.packageName in selected }
+        val catalog = AppOrder.byLabel(
+            items = core.all.filterNot { it.packageName in selected },
+            label = { it.label },
+            tieBreak = { it.packageName },
+        )
         val settingsPkg = SuggestedApps.settingsPackage(getApplication())
         val granted = NlsStatus.isGranted(getApplication())
         val allowByPkg = core.prefs.entries.associate { it.packageName to it.allowNotif }

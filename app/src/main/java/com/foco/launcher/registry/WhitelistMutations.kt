@@ -27,6 +27,27 @@ object WhitelistMutations {
         return entries.filterNot { it.packageName == packageName }.normalized()
     }
 
+    /**
+     * [displayed] is the order the user already sees. A no-op move still
+     * rewrites [WhitelistEntry.order] so a later custom-order read stays put.
+     */
+    fun reorderDisplayed(
+        displayed: List<WhitelistEntry>,
+        fromIndex: Int,
+        toIndex: Int,
+    ): List<WhitelistEntry> {
+        if (displayed.isEmpty()) return displayed
+        if (fromIndex !in displayed.indices || toIndex !in displayed.indices) {
+            return displayed.mapIndexed { index, entry -> entry.copy(order = index) }
+        }
+        val mutable = displayed.toMutableList()
+        if (fromIndex != toIndex) {
+            val item = mutable.removeAt(fromIndex)
+            mutable.add(toIndex, item)
+        }
+        return mutable.mapIndexed { index, entry -> entry.copy(order = index) }
+    }
+
     fun move(entries: List<WhitelistEntry>, fromIndex: Int, toIndex: Int): List<WhitelistEntry> {
         val ordered = entries.sortedBy { it.order }
         if (fromIndex == toIndex) return ordered.normalized()

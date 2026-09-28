@@ -1,5 +1,7 @@
 package com.foco.launcher.work
 
+import com.foco.launcher.registry.AppOrder
+
 /**
  * Home Trabajo rules. Every launchable is shown. Nothing is dropped, hidden, or ranked.
  * Search filters the grid only; the catalog itself stays complete (A1, empty query).
@@ -15,10 +17,10 @@ object WorkCatalogRules {
         packageName: (T) -> String,
         className: (T) -> String,
     ): List<T> {
-        return activities.sortedWith(
-            compareBy<T> { label(it).lowercase() }
-                .thenBy { packageName(it) }
-                .thenBy { className(it) },
+        return AppOrder.byLabel(
+            items = activities,
+            label = label,
+            tieBreak = { "${packageName(it)}\u0000${className(it)}" },
         )
     }
 

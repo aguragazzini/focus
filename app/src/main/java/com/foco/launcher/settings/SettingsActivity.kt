@@ -82,6 +82,11 @@ class SettingsActivity : ComponentActivity() {
                         finish()
                     },
                     onRequestCalendar = { AgendaAccess.request(this, calendarPermission) },
+                    onOpenAllApps = {
+                        if (!LaunchController.openAllApps(this)) {
+                            Toast.makeText(this, R.string.open_fail, Toast.LENGTH_SHORT).show()
+                        }
+                    },
                 )
             }
         }
