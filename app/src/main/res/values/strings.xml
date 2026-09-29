@@ -216,6 +216,8 @@
     <string name="work_resume">Reanudar Trabajo</string>
     <string name="work_pause_sub">Oculta las apps de Trabajo en el inicio. Los avisos de Trabajo no suenan en Foco.</string>
     <string name="work_paused_chip">Trabajo · En pausa</string>
+    <string name="work_pill_off">Trabajo</string>
+    <string name="work_pill_on">Pausado</string>
     <string name="work_pause_status">En pausa</string>
     <string name="work_visible_status">Visible en el inicio</string>
     <string name="drag_cross_hint">Personal y Trabajo van separados.</string>

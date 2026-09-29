@@ -1542,14 +1542,14 @@ private fun WorkHomePage(
             )
             if (state.hasWorkProfile) {
                 Spacer(Modifier.height(FocoSpace.gap))
-                PagePause(
-                    paused = focoPaused,
-                    idle = stringResource(R.string.work_pause),
-                    active = stringResource(R.string.work_paused_chip),
+                FocoStatePill(
+                    label = stringResource(if (focoPaused) R.string.work_pill_on else R.string.work_pill_off),
+                    on = focoPaused,
                     onClick = { onWorkPaused(!state.workSectionPaused) },
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
                 )
             }
-            Spacer(Modifier.height(FocoSpace.gapLg))
+            Spacer(Modifier.height(FocoSpace.section))
         }
         if (focoPaused) {
             item(key = "$pageKey:work-paused") {
@@ -1775,40 +1775,6 @@ private fun HomePagerCue(
                 style = MaterialTheme.typography.bodyMedium,
                 color = FocoPaperDim,
                 fontSize = 11.sp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PagePause(
-    paused: Boolean,
-    idle: String,
-    active: String,
-    onClick: () -> Unit,
-) {
-    val label = if (paused) active else idle
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = FocoSpace.page),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .height(FocoSpace.touch)
-                .clip(RoundedCornerShape(50))
-                .background(if (paused) FocoInkElevated else Color.Transparent)
-                .clickable(onClick = onClick)
-                .padding(horizontal = FocoSpace.gapLg),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (paused) FocoPaper else FocoPaperDim,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.semantics { contentDescription = label },
             )
         }
     }

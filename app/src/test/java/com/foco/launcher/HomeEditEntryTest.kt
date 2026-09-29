@@ -23,7 +23,7 @@ class HomeEditEntryTest {
     @Test
     fun pagerCueClickOpensEdit() {
         val src = File("src/main/java/com/foco/launcher/core/HomeScreen.kt").readText()
-        val cue = src.substringAfter("fun HomePagerCue").substringBefore("fun PagePause")
+        val cue = src.substringAfter("fun HomePagerCue").substringBefore("fun EscapePad")
         assertTrue(cue.contains("onClick = onEdit"))
         assertFalse(cue.contains("onClick = {}"))
         assertTrue(cue.contains("onLongClick = onEdit"))
