@@ -18,6 +18,7 @@ import com.foco.launcher.core.AgendaAccess
 import com.foco.launcher.core.FocoTheme
 import com.foco.launcher.core.LaunchController
 import com.foco.launcher.core.LauncherActivity
+import com.foco.launcher.registry.HomePages
 import com.foco.launcher.notification.NlsStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -85,6 +86,10 @@ class SettingsActivity : ComponentActivity() {
                         finish()
                     },
                     onRequestCalendar = { AgendaAccess.request(this, calendarPermission) },
+                    onOpenUso = {
+                        startActivity(LauncherActivity.pageIntent(this, HomePages.TYPE_USO))
+                        finish()
+                    },
                     onOpenAllApps = {
                         if (!LaunchController.openAllApps(this)) {
                             Toast.makeText(this, R.string.open_fail, Toast.LENGTH_SHORT).show()

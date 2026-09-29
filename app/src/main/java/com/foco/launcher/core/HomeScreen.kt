@@ -186,6 +186,8 @@ fun HomeScreen(
     onMoveBlock: (String, String, Int) -> Unit = { _, _, _ -> },
     onUpdateBlock: (String, com.foco.launcher.registry.PageBlock) -> Unit = { _, _ -> },
     homeToken: Int = 0,
+    openPage: String? = null,
+    onOpenPageConsumed: () -> Unit = {},
 ) {
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -389,11 +391,22 @@ fun HomeScreen(
                 if (pagerState.currentPage > last) pagerState.scrollToPage(last)
             }
             LaunchedEffect(homeToken) {
-                if (homeToken > 0) editing = false
+                if (homeToken > 0 && !requestEdit) editing = false
+                if (!openPage.isNullOrBlank()) return@LaunchedEffect
                 val pages = HomePages.visible(state.homePages)
                 val last = (pages.size - 1).coerceAtLeast(0)
                 val target = HomePages.landingIndex(pages).coerceIn(0, last)
                 if (pagerState.currentPage != target) pagerState.scrollToPage(target)
+            }
+            LaunchedEffect(openPage, visible) {
+                val type = openPage?.trim()?.uppercase().orEmpty()
+                if (type.isEmpty()) return@LaunchedEffect
+                val index = visible.indexOfFirst { it.type == type }
+                if (index >= 0) {
+                    editing = false
+                    pagerState.scrollToPage(index)
+                }
+                onOpenPageConsumed()
             }
             val pageLabels = visible.map { pageLabel(it) }
             val cueIndex = pagerState.currentPage.coerceIn(0, (pageLabels.size - 1).coerceAtLeast(0))
@@ -584,6 +597,33 @@ fun HomeScreen(
                             )
                         },
                     )
+                    HomePages.TYPE_USO -> {
+                        if (spec.blocksSet) {
+                            BlockPage(
+                                blocks = com.foco.launcher.registry.PageBlocks.effective(spec),
+                                state = state,
+                                onOpenClock = onOpenClock,
+                                onOpenCalendar = onOpenCalendar,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                onNotificationsPaused = onNotificationsPaused,
+                                onPhonePaused = onPhonePaused,
+                                onSilence = onSilence,
+                                onLaunch = onLaunch,
+                                onOpenAvisos = onOpenAvisos,
+                                onArmSilence = onArmSilence,
+                                onUpdateBlock = { onUpdateBlock(spec.id, it) },
+                            )
+                        } else {
+                            UsageHomePage(
+                                title = spec.label,
+                                onLaunch = onLaunch,
+                                onOpenSystemSettings = onOpenSystemSettings,
+                                active = pagerState.settledPage == page,
+                                namesOnly = state.namesOnly,
+                                personal = state.apps.map { it.packageName }.toSet(),
+                            )
+                        }
+                    }
                     HomePages.TYPE_DIET -> {
                         val meals = remember(context) {
                             DietPlan.peek() ?: runCatching {
@@ -1126,6 +1166,7 @@ private fun HomePageTypePicker(onPick: (String, String) -> Unit) {
         HomePages.TYPE_CLOCK to R.string.page_clock,
         HomePages.TYPE_AGENDA to R.string.page_agenda,
         HomePages.TYPE_PERSONAL to R.string.section_personal,
+        HomePages.TYPE_USO to R.string.page_uso,
         HomePages.TYPE_APPS to R.string.home_page_apps,
         HomePages.TYPE_DIET to R.string.page_diet,
         HomePages.TYPE_WORK to R.string.section_work,
@@ -1501,14 +1542,14 @@ private fun WorkHomePage(
             )
             if (state.hasWorkProfile) {
                 Spacer(Modifier.height(FocoSpace.gap))
-                PagePause(
-                    paused = focoPaused,
-                    idle = stringResource(R.string.work_pause),
-                    active = stringResource(R.string.work_paused_chip),
+                FocoStatePill(
+                    label = stringResource(if (focoPaused) R.string.work_pill_on else R.string.work_pill_off),
+                    on = focoPaused,
                     onClick = { onWorkPaused(!state.workSectionPaused) },
+                    modifier = Modifier.padding(horizontal = FocoSpace.page),
                 )
             }
-            Spacer(Modifier.height(FocoSpace.gapLg))
+            Spacer(Modifier.height(FocoSpace.section))
         }
         if (focoPaused) {
             item(key = "$pageKey:work-paused") {
@@ -1681,6 +1722,7 @@ private fun pageLabel(page: HomePageSpec): String {
             HomePages.TYPE_CLOCK -> R.string.page_clock
             HomePages.TYPE_AGENDA -> R.string.page_agenda
             HomePages.TYPE_PERSONAL -> R.string.section_personal
+            HomePages.TYPE_USO -> R.string.page_uso
             HomePages.TYPE_DIET -> R.string.page_diet
             HomePages.TYPE_WORK -> R.string.section_work
             else -> R.string.home_page_apps
@@ -1701,7 +1743,7 @@ private fun HomePagerCue(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(onClick = {}, onLongClick = onEdit)
+            .combinedClickable(onClick = onEdit, onLongClick = onEdit)
             .padding(top = FocoSpace.hair, bottom = FocoSpace.gap),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -1711,7 +1753,10 @@ private fun HomePagerCue(
                 Box(
                     modifier = Modifier
                         .size(FocoSpace.touch)
-                        .clickable { onSelect(index) }
+                        .combinedClickable(
+                            onClick = { onSelect(index) },
+                            onLongClick = onEdit,
+                        )
                         .semantics { contentDescription = label },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -1730,40 +1775,6 @@ private fun HomePagerCue(
                 style = MaterialTheme.typography.bodyMedium,
                 color = FocoPaperDim,
                 fontSize = 11.sp,
-            )
-        }
-    }
-}
-
-@Composable
-private fun PagePause(
-    paused: Boolean,
-    idle: String,
-    active: String,
-    onClick: () -> Unit,
-) {
-    val label = if (paused) active else idle
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = FocoSpace.page),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .height(FocoSpace.touch)
-                .clip(RoundedCornerShape(50))
-                .background(if (paused) FocoInkElevated else Color.Transparent)
-                .clickable(onClick = onClick)
-                .padding(horizontal = FocoSpace.gapLg),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyMedium,
-                color = if (paused) FocoPaper else FocoPaperDim,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.semantics { contentDescription = label },
             )
         }
     }

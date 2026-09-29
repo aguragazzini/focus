@@ -43,7 +43,7 @@ data class LauncherPrefs(
     /** These packages do not launch, and the listener cancels their notifications. */
     val pausedPackages: List<String> = emptyList(),
     /**
-     * Home pager. Empty means the default pages (Reloj, Agenda, Personal, Comida, Trabajo).
+     * Home pager. Empty means the default pages (Reloj, Agenda, Personal, Uso, Comida, Trabajo).
      * Unknown or all-hidden lists are restored by [HomePages.resolve], not here.
      */
     val pages: List<HomePageSpec> = emptyList(),

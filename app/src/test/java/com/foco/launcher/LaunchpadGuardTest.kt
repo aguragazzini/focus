@@ -81,6 +81,7 @@ class LaunchpadGuardTest {
                 HomePages.TYPE_CLOCK,
                 HomePages.TYPE_AGENDA,
                 HomePages.TYPE_PERSONAL,
+                HomePages.TYPE_USO,
                 HomePages.TYPE_DIET,
                 HomePages.TYPE_WORK,
             ),

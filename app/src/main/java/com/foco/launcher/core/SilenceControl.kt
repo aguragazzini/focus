@@ -59,7 +59,6 @@ fun SilenceControl(
     modifier: Modifier = Modifier,
 ) {
     val level = Silence.level(notificationsPaused, phonePaused)
-    val view = LocalView.current
     val on = listenerReady && level == SilenceLevel.FOCO
     val visible = when {
         !listenerReady -> stringResource(R.string.silence_activate)
@@ -70,12 +69,68 @@ fun SilenceControl(
     val stateLabel = stringResource(if (on) R.string.silence_a11y_on else R.string.silence_a11y_off)
     val hint = stringResource(if (on) R.string.silence_a11y_hint_off else R.string.silence_a11y_hint_on)
     val activateLabel = stringResource(R.string.silence_activate)
+    FocoStatePill(
+        label = visible,
+        on = on,
+        onClick = { if (listenerReady) onChange(Silence.toggle(level)) else onActivate() },
+        modifier = modifier,
+        leading = {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Outlined.Notifications,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp),
+                    tint = if (on) FocoPaper else FocoPaperDim,
+                )
+                if (on) {
+                    Box(
+                        Modifier
+                            .width(16.dp)
+                            .height(1.5.dp)
+                            .rotate(-42f)
+                            .background(FocoPaper),
+                    )
+                }
+            }
+        },
+        semantics = { activate ->
+            clearAndSetSemantics {
+                if (listenerReady) {
+                    role = Role.Switch
+                    contentDescription = name
+                    stateDescription = stateLabel
+                    toggleableState = if (on) ToggleableState.On else ToggleableState.Off
+                    onClick(label = hint) { activate(); true }
+                } else {
+                    role = Role.Button
+                    contentDescription = activateLabel
+                    onClick { activate(); true }
+                }
+            }
+        },
+    )
+}
+
+/**
+ * Shared pause pill. Off is inkElevated, a 1dp line, and Paper dim.
+ * On is Paper at 11% with a 1.5dp Paper border. A press scales to 0.98.
+ */
+@Composable
+internal fun FocoStatePill(
+    label: String,
+    on: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    leading: (@Composable () -> Unit)? = null,
+    semantics: (Modifier.(activate: () -> Unit) -> Modifier)? = null,
+) {
+    val view = LocalView.current
     val shape = RoundedCornerShape(50)
     val press = remember { MutableInteractionSource() }
     val pressed by press.collectIsPressedAsState()
-    val act = {
+    val activate = {
         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-        if (listenerReady) onChange(Silence.toggle(level)) else onActivate()
+        onClick()
     }
     Box(
         modifier = modifier.fillMaxWidth(),
@@ -99,44 +154,16 @@ fun SilenceControl(
                 .clickable(
                     interactionSource = press,
                     indication = null,
-                    onClick = act,
+                    onClick = activate,
                 )
-                .clearAndSetSemantics {
-                    if (listenerReady) {
-                        role = Role.Switch
-                        contentDescription = name
-                        stateDescription = stateLabel
-                        toggleableState = if (on) ToggleableState.On else ToggleableState.Off
-                        onClick(label = hint) { act(); true }
-                    } else {
-                        role = Role.Button
-                        contentDescription = activateLabel
-                        onClick { act(); true }
-                    }
-                }
+                .then(semantics?.invoke(Modifier, activate) ?: Modifier)
                 .padding(horizontal = FocoSpace.gapLg),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = if (leading != null) Arrangement.spacedBy(8.dp) else Arrangement.Center,
         ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = Icons.Outlined.Notifications,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                    tint = if (on) FocoPaper else FocoPaperDim,
-                )
-                if (on) {
-                    Box(
-                        Modifier
-                            .width(16.dp)
-                            .height(1.5.dp)
-                            .rotate(-42f)
-                            .background(FocoPaper),
-                    )
-                }
-            }
+            leading?.invoke()
             Text(
-                text = visible,
+                text = label,
                 color = if (on) FocoPaper else FocoPaperDim,
                 textAlign = TextAlign.Center,
                 fontSize = 16.sp,

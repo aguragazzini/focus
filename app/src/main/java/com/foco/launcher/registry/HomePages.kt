@@ -3,7 +3,7 @@ package com.foco.launcher.registry
 import kotlinx.serialization.Serializable
 
 /**
- * Home pager layout. An empty stored list means the default five pages.
+ * Home pager layout. An empty stored list means the default six pages.
  * Several pages may share a type: they read the same clock, agenda, whitelist, diet, or work catalog.
  * APPS is the personal grid without Pausar avisos. It is not a second whitelist.
  */
@@ -23,25 +23,29 @@ object HomePages {
     const val TYPE_CLOCK = "CLOCK"
     const val TYPE_AGENDA = "AGENDA"
     const val TYPE_PERSONAL = "PERSONAL"
+    const val TYPE_USO = "USO"
     const val TYPE_DIET = "DIET"
     const val TYPE_WORK = "WORK"
     const val TYPE_APPS = "APPS"
     const val MAX = 12
 
-    val TYPES = setOf(TYPE_CLOCK, TYPE_AGENDA, TYPE_PERSONAL, TYPE_DIET, TYPE_WORK, TYPE_APPS)
+    val TYPES = setOf(TYPE_CLOCK, TYPE_AGENDA, TYPE_PERSONAL, TYPE_USO, TYPE_DIET, TYPE_WORK, TYPE_APPS)
 
     fun defaults(): List<HomePageSpec> = listOf(
         HomePageSpec(id = "page-clock", type = TYPE_CLOCK),
         HomePageSpec(id = "page-agenda", type = TYPE_AGENDA),
         HomePageSpec(id = "page-personal", type = TYPE_PERSONAL),
+        HomePageSpec(id = "page-uso", type = TYPE_USO),
         HomePageSpec(id = "page-diet", type = TYPE_DIET),
         HomePageSpec(id = "page-work", type = TYPE_WORK),
     )
 
     /**
      * Drop unknown rows. Empty, or nothing left visible, restores [defaults].
-     * [layoutEdited] skips the one-time Agenda splice. Without it, deleting
-     * Agenda from the defaults looks like the old four-page layout and comes back.
+     * [layoutEdited] skips the one-time Agenda and Uso splices.
+     * Deleting Uso from the current defaults matches the 0.9.9 five and comes back
+     * until the layout is edited. Deleting Agenda from the current six does not
+     * match the old four, so it stays gone.
      */
     fun resolve(raw: List<HomePageSpec>, layoutEdited: Boolean = false): List<HomePageSpec> {
         if (raw.isEmpty()) return defaults()
@@ -56,7 +60,8 @@ object HomePages {
             cleaned += spec.copy(id = id, type = type, label = label, blocks = blocks)
         }
         if (cleaned.isEmpty() || cleaned.none { !it.hidden }) return defaults()
-        return if (layoutEdited) cleaned else legacyDefaultWithAgenda(cleaned)
+        if (layoutEdited) return cleaned
+        return defaultWithUso(legacyDefaultWithAgenda(cleaned))
     }
 
     /**
@@ -76,6 +81,23 @@ object HomePages {
         return listOf(pages[0], agenda) + pages.drop(1)
     }
 
+    /**
+     * The 0.9.3–0.9.9 default five, stored as-is, gains Uso after Personal.
+     * A renamed, reordered, hidden, or extra page is left alone.
+     */
+    private fun defaultWithUso(pages: List<HomePageSpec>): List<HomePageSpec> {
+        if (pages.any { it.type == TYPE_USO }) return pages
+        val ids = listOf("page-clock", "page-agenda", "page-personal", "page-diet", "page-work")
+        val types = listOf(TYPE_CLOCK, TYPE_AGENDA, TYPE_PERSONAL, TYPE_DIET, TYPE_WORK)
+        val untouched = pages.size == 5 &&
+            pages.map { it.id } == ids &&
+            pages.map { it.type } == types &&
+            pages.all { it.label.isEmpty() && !it.hidden && it.blocks.isEmpty() && !it.blocksSet }
+        if (!untouched) return pages
+        val uso = HomePageSpec(id = "page-uso", type = TYPE_USO)
+        return pages.take(3) + uso + pages.drop(3)
+    }
+
     fun visible(pages: List<HomePageSpec>): List<HomePageSpec> = pages.filter { !it.hidden }
 
     /** First visible Personal page. Otherwise the first visible page. */
@@ -91,7 +113,7 @@ object HomePages {
      */
     fun drawsPageTitle(page: HomePageSpec): Boolean = when (page.type) {
         TYPE_PERSONAL, TYPE_APPS, TYPE_WORK -> true
-        TYPE_AGENDA -> page.label.isNotBlank()
+        TYPE_AGENDA, TYPE_USO -> page.label.isNotBlank()
         else -> false
     }
 

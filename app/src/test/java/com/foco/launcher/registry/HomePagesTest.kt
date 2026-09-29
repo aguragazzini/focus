@@ -16,6 +16,7 @@ class HomePagesTest {
                 HomePages.TYPE_CLOCK,
                 HomePages.TYPE_AGENDA,
                 HomePages.TYPE_PERSONAL,
+                HomePages.TYPE_USO,
                 HomePages.TYPE_DIET,
                 HomePages.TYPE_WORK,
             ),
@@ -27,7 +28,8 @@ class HomePagesTest {
         assertFalse(HomePages.drawsPageTitle(pages[1]))
         assertTrue(HomePages.drawsPageTitle(pages[2]))
         assertFalse(HomePages.drawsPageTitle(pages[3]))
-        assertTrue(HomePages.drawsPageTitle(pages[4]))
+        assertFalse(HomePages.drawsPageTitle(pages[4]))
+        assertTrue(HomePages.drawsPageTitle(pages[5]))
         assertTrue(HomePages.drawsPageTitle(pages[1].copy(label = "Hoy")))
     }
 
@@ -74,7 +76,7 @@ class HomePagesTest {
         assertEquals(hiddenTail, HomePages.setHidden(hiddenTail, hiddenTail.first().id, true))
         assertEquals(hiddenTail, HomePages.delete(hiddenTail, hiddenTail.first().id))
         val withoutHidden = HomePages.delete(hiddenTail, hiddenTail[1].id)
-        assertEquals(4, withoutHidden.size)
+        assertEquals(5, withoutHidden.size)
         assertTrue(withoutHidden.none { it.id == hiddenTail[1].id })
     }
 
@@ -82,7 +84,7 @@ class HomePagesTest {
     fun createRenameMoveAndRepeatTypes() {
         val start = HomePages.defaults()
         val created = HomePages.create(start, "apps", "  Vacío  ", "page-apps")
-        assertEquals(6, created.size)
+        assertEquals(7, created.size)
         assertEquals(HomePages.TYPE_APPS, created.last().type)
         assertEquals("Vacío", created.last().label)
         assertEquals(start, HomePages.create(start, "NOPE", "X", "n"))
@@ -100,8 +102,8 @@ class HomePagesTest {
         assertEquals(created, HomePages.rename(created, "missing", "Hola"))
 
         val moved = HomePages.move(start, "page-work", -1)
-        assertEquals(HomePages.TYPE_WORK, moved[3].type)
-        assertEquals(HomePages.TYPE_DIET, moved[4].type)
+        assertEquals(HomePages.TYPE_WORK, moved[4].type)
+        assertEquals(HomePages.TYPE_DIET, moved[5].type)
         assertEquals(start, HomePages.move(start, "page-clock", -1))
         assertEquals(start, HomePages.move(start, "missing", 1))
 
@@ -129,14 +131,21 @@ class HomePagesTest {
     }
 
     @Test
-    fun deletingAgendaStaysGoneAfterTheLayoutIsEdited() {
+    fun deletingAgendaFromCurrentDefaultsStaysGone() {
         val without = HomePages.delete(HomePages.defaults(), "page-agenda")
         assertFalse(without.any { it.type == HomePages.TYPE_AGENDA })
-        val spliced = HomePages.resolve(without, layoutEdited = false)
-        assertTrue(spliced.any { it.type == HomePages.TYPE_AGENDA })
+        assertFalse(HomePages.resolve(without, layoutEdited = false).any { it.type == HomePages.TYPE_AGENDA })
+        assertFalse(HomePages.resolve(without, layoutEdited = true).any { it.type == HomePages.TYPE_AGENDA })
+    }
+
+    @Test
+    fun deletingUsoComesBackUntilTheLayoutIsEdited() {
+        val without = HomePages.delete(HomePages.defaults(), "page-uso")
+        assertFalse(without.any { it.type == HomePages.TYPE_USO })
+        assertTrue(HomePages.resolve(without, layoutEdited = false).any { it.type == HomePages.TYPE_USO })
         val kept = HomePages.resolve(without, layoutEdited = true)
-        assertFalse(kept.any { it.type == HomePages.TYPE_AGENDA })
-        assertEquals(4, kept.size)
+        assertFalse(kept.any { it.type == HomePages.TYPE_USO })
+        assertEquals(5, kept.size)
     }
 
     @Test
@@ -152,6 +161,7 @@ class HomePagesTest {
                 HomePages.TYPE_CLOCK,
                 HomePages.TYPE_AGENDA,
                 HomePages.TYPE_PERSONAL,
+                HomePages.TYPE_USO,
                 HomePages.TYPE_DIET,
                 HomePages.TYPE_WORK,
             ),
